@@ -27,7 +27,10 @@ export type FieldKey =
   | "cta"        // call-to-action text (button / pill)
   | "promoCode"  // discount code
   | "contact"    // phone / address line
-  | "website";   // url
+  | "website"    // url
+  | "quote"      // a testimonial / pull-quote line
+  | "attribution" // who said the quote (name, role)
+  | "detail";    // a date / time / location / secondary detail line
 
 export interface FieldDef {
   key: FieldKey;
@@ -47,9 +50,51 @@ export const FIELDS: Record<FieldKey, FieldDef> = {
   promoCode: { key: "promoCode", label: "Promo code", placeholder: "WELLNESS99" },
   contact: { key: "contact", label: "Contact line", placeholder: "(503) 555 · 0198" },
   website: { key: "website", label: "Website", placeholder: "providencecareplus.com" },
+  quote: { key: "quote", label: "Quote", placeholder: "The best care I've had in years.", long: true },
+  attribution: { key: "attribution", label: "Attributed to", placeholder: "Maria G. · Patient since 2021" },
+  detail: { key: "detail", label: "Detail line", placeholder: "Saturday, May 18 · 10am–2pm" },
 };
 
 /** The uploaded logo (data URL) — separate from text fields; not every template uses it. */
+
+// ── Photo ────────────────────────────────────────────────────────────────────
+// A single uploaded photo, shared across platforms like the logo/colors/fonts.
+// Two templates consume it in different ways:
+//   • PANEL   — the photo is carved into ONE side behind a shaped seam (a
+//               "meet the team" / product-hero look). Uses `side` + `divider`.
+//   • FULLBLEED — the photo fills the whole banner behind a scrim (a mood /
+//               quote / event look). Ignores `side` + `divider`.
+// A template declares which mode it wants (its `photoMode`); the SAME PhotoSpec
+// feeds both. `zoom` + `focusX/Y` frame the crop so a face stays in view — the
+// focal dot in the editor sets focusX/Y directly.
+
+export type PhotoDivider = "straight" | "diagonal" | "curve";
+
+export interface PhotoSpec {
+  /** The uploaded image as a data URL, or null when none. */
+  dataUrl: string | null;
+  /** Which side the carved PANEL occupies (ignored in full-bleed). */
+  side: "left" | "right";
+  /** The seam shape between the panel and the text (ignored in full-bleed). */
+  divider: PhotoDivider;
+  /** Cover-scale multiplier: 1 = fill, up to 2.5 = punch in. */
+  zoom: number;
+  /** Focal point 0..1 — what stays visible when the photo is cropped. */
+  focusX: number; // 0 = left edge, 1 = right edge
+  focusY: number; // 0 = top edge, 1 = bottom edge
+}
+
+export const DEFAULT_PHOTO: PhotoSpec = {
+  dataUrl: null,
+  side: "left",
+  divider: "diagonal",
+  zoom: 1,
+  focusX: 0.5,
+  focusY: 0.35, // faces sit slightly above center — this frames them by default
+};
+
+/** How a template consumes the shared photo (if at all). */
+export type PhotoMode = "none" | "panel" | "fullbleed";
 
 // ── Finishes ─────────────────────────────────────────────────────────────────
 // The composable layer stack. Each finish is a self-contained visual layer,
@@ -123,7 +168,20 @@ export type TemplateId =
   | "logo"
   | "typographic"
   | "color-blocked"
-  | "editorial";
+  | "editorial"
+  // ── photo templates (added 2026-07-18) ──
+  | "team-intro"
+  | "product-hero"
+  | "quote"
+  | "event"
+  | "split-feature"
+  // ── non-photo templates (added 2026-07-18) ──
+  | "announcement"
+  | "testimonial"
+  | "menu"
+  | "countdown"
+  | "wordmark"
+  | "stat";
 
 // ── The full design state ────────────────────────────────────────────────────
 // This is what persists (localStorage) and what rides in the reopen/export blob.
@@ -147,6 +205,10 @@ export interface BannerState {
   // Uploaded logo (data URL) — used by templates that map a logo slot.
   logoDataUrl: string | null;
 
+  // Uploaded photo + its framing (shared). Consumed by photo templates as a
+  // carved side panel or a full-bleed background; ignored by the rest.
+  photo: PhotoSpec;
+
   // Palette (shared). accent tints finishes + accent words; ink is the deep base
   // color; paper is the light base. Templates decide which they lean on.
   accent: string;
@@ -169,12 +231,15 @@ export const DEFAULT_FIELDS: Record<FieldKey, string> = {
   promoCode: "WELLNESS99",
   contact: "(503) 555 · 0198",
   website: "providencecareplus.com",
+  quote: "The best care I've had in years — I actually feel heard.",
+  attribution: "Maria G. · Patient since 2021",
+  detail: "Saturday, May 18 · 10am – 2pm",
 };
 
 // A pleasant default template per platform — varied so a fresh open already
 // shows the mix-and-match idea (Facebook color-blocked, OG editorial, etc).
 export const DEFAULT_TEMPLATES: Record<PlatformId, TemplateId> = {
-  facebook: "color-blocked",
+  facebook: "team-intro",
   og: "promotion",
   linkedin: "cta",
   twitter: "brand-story",
@@ -183,7 +248,7 @@ export const DEFAULT_TEMPLATES: Record<PlatformId, TemplateId> = {
 // Each platform's default finish stack = its template's default (filled in below
 // to avoid a circular import with templates.ts). See bannerInitial.
 export const DEFAULT_PLATFORM_FINISHES: Record<PlatformId, FinishKind[]> = {
-  facebook: ["diagonal-split", "seam-gradient"],
+  facebook: ["blur-blob"],
   og: ["ghost-text", "blur-blob"],
   linkedin: ["diagonal-split", "ghost-text", "grain"],
   twitter: ["scrim", "blur-blob"],
@@ -200,6 +265,7 @@ export const bannerInitial: BannerState = {
   },
   fields: { ...DEFAULT_FIELDS },
   logoDataUrl: null,
+  photo: { ...DEFAULT_PHOTO },
   accent: "#c8a46b", // gold
   ink: "#1b4d3e", // forest
   paper: "#f6f1e7", // cream

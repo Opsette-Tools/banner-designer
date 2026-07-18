@@ -593,6 +593,501 @@ function Editorial({ ctx }: { ctx: TemplateContext }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  PHOTO TEMPLATES (added 2026-07-18)
+//  Each reads ctx.photoZone to keep copy off the carved panel; the photo itself
+//  is painted by BannerCanvas (panel or full-bleed), NOT by these compositions.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// A padded content box that lives INSIDE the clear text zone of a photo panel.
+// When there's no panel (photoZone = 0..100) it's just full-width padded content.
+function ZoneContent({
+  zone,
+  children,
+  style,
+}: {
+  zone: { x0: number; x1: number };
+  children: ReactNode;
+  style?: CSSProperties;
+}) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 0,
+        bottom: 0,
+        left: `${zone.x0}%`,
+        right: `${100 - zone.x1}%`,
+        display: "flex",
+        flexDirection: "column",
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ── 9. TEAM INTRO (photo panel) ────────────────────────────────────────────────
+// Photo carved on one side; name, role (eyebrow) and a line on the clear side.
+// The "meet the team" / "about us" staple.
+function TeamIntro({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent, ink, paper, photoZone, hasPanel } = ctx;
+  const onPaper = darken(ink, 0.15);
+  // If the panel is on the left, text is on the right — nudge padding accordingly.
+  const padSide = ctx.photo.side === "left" || !hasPanel ? "3%" : "0";
+  return (
+    <ZoneContent
+      zone={photoZone}
+      style={{ justifyContent: "center", paddingLeft: hasPanel && ctx.photo.side === "left" ? "3%" : padSide, paddingRight: "4%", gap: 14 }}
+    >
+      {has("eyebrow") && <div style={eyebrowStyle(darken(accent, 0.2), fonts, 14)}>{f("eyebrow")}</div>}
+      {has("brand") && (
+        <h2
+          style={{
+            fontFamily: fonts.heading,
+            fontWeight: fonts.headingWeight,
+            fontSize: 68,
+            lineHeight: 0.98,
+            letterSpacing: "-0.02em",
+            color: onPaper,
+            margin: 0,
+          }}
+        >
+          {f("brand")}
+        </h2>
+      )}
+      {has("tagline") && (
+        <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 4 }}>
+          <div style={{ height: 2, width: 54, background: accent, flexShrink: 0 }} />
+          <div style={{ fontFamily: fonts.body, fontSize: 20, lineHeight: 1.35, color: alpha(onPaper, 0.82), maxWidth: 520 }}>
+            {f("tagline")}
+          </div>
+        </div>
+      )}
+      {has("contact") && (
+        <div style={{ ...metaStyle(alpha(onPaper, 0.6), fonts, 13), marginTop: 10 }}>{f("contact")}</div>
+      )}
+    </ZoneContent>
+  );
+}
+
+// ── 10. PRODUCT HERO (photo panel) ──────────────────────────────────────────────
+// Product photo on one side (curve seam by default), the offer/price as a big
+// number and a CTA pill on the clear side. Selling a thing.
+function ProductHero({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent, ink, paper, photoZone } = ctx;
+  const onPaper = darken(ink, 0.15);
+  return (
+    <ZoneContent zone={photoZone} style={{ justifyContent: "center", padding: "0 4%", gap: 12 }}>
+      {has("eyebrow") && <div style={eyebrowStyle(darken(accent, 0.2), fonts, 13)}>{f("eyebrow")}</div>}
+      {has("headline") && (
+        <AccentHeadline
+          text={f("headline")}
+          fonts={fonts}
+          color={onPaper}
+          accent={darken(accent, 0.1)}
+          fontSize={54}
+          weight={fonts.headingWeight}
+          lineHeight={1.0}
+          maxWidth="100%"
+        />
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 22, marginTop: 8, flexWrap: "wrap" }}>
+        {has("offer") && (
+          <div style={{ fontFamily: fonts.heading, fontStyle: "italic", fontSize: 76, lineHeight: 0.9, color: accent }}>
+            {f("offer")}
+          </div>
+        )}
+        {has("cta") && (
+          <div
+            role="presentation"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 10,
+              borderRadius: 999,
+              background: darken(ink, 0.05),
+              color: paper,
+              padding: "16px 26px",
+              fontFamily: fonts.body,
+              fontWeight: 600,
+              fontSize: 18,
+              boxShadow: `0 14px 30px -12px ${alpha(ink, 0.6)}`,
+            }}
+          >
+            {f("cta")}
+            <span aria-hidden style={{ color: lighten(accent, 0.25) }}>→</span>
+          </div>
+        )}
+      </div>
+      {has("brand") && (
+        <div style={{ ...metaStyle(alpha(onPaper, 0.6), fonts, 13), marginTop: 10 }}>{f("brand")}</div>
+      )}
+    </ZoneContent>
+  );
+}
+
+// ── 11. QUOTE / TESTIMONIAL (full-bleed photo) ──────────────────────────────────
+// Full-bleed photo + scrim, a big italic pull-quote, attribution beneath. Social
+// proof with a face behind it.
+function QuoteBanner({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent } = ctx;
+  const onDark = "#ffffff";
+  return (
+    <Content style={{ flexDirection: "column", justifyContent: "center", padding: "0 6%" }}>
+      <div aria-hidden style={{ fontFamily: fonts.heading, fontStyle: "italic", fontSize: 120, lineHeight: 0.5, color: alpha(accent, 0.9), height: 40 }}>
+        “
+      </div>
+      {has("quote") && (
+        <h2
+          style={{
+            fontFamily: fonts.heading,
+            fontStyle: "italic",
+            fontWeight: 300,
+            fontSize: 52,
+            lineHeight: 1.12,
+            letterSpacing: "-0.01em",
+            color: onDark,
+            margin: 0,
+            maxWidth: "78%",
+          }}
+        >
+          {f("quote")}
+        </h2>
+      )}
+      {has("attribution") && (
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 24 }}>
+          <div style={{ height: 2, width: 44, background: accent }} />
+          <div style={metaStyle(alpha(onDark, 0.85), fonts, 14)}>{f("attribution")}</div>
+        </div>
+      )}
+    </Content>
+  );
+}
+
+// ── 12. EVENT / ANNOUNCEMENT (full-bleed photo) ─────────────────────────────────
+// Full-bleed photo, bottom scrim, "you're invited" eyebrow, headline + a date/
+// place detail line, contact bottom-right.
+function EventBanner({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent } = ctx;
+  const onDark = "#ffffff";
+  return (
+    <Content style={{ flexDirection: "column", justifyContent: "flex-end", padding: "4%" }}>
+      {has("eyebrow") && (
+        <div style={{ ...eyebrowStyle(lighten(accent, 0.2), fonts, 14), marginBottom: 14 }}>{f("eyebrow")}</div>
+      )}
+      {has("headline") && (
+        <h2
+          style={{
+            fontFamily: fonts.heading,
+            fontWeight: fonts.headingWeight,
+            fontSize: 70,
+            lineHeight: 0.98,
+            letterSpacing: "-0.02em",
+            color: onDark,
+            margin: 0,
+            maxWidth: "80%",
+          }}
+        >
+          {f("headline")}
+        </h2>
+      )}
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 24, marginTop: 20 }}>
+        {has("detail") && (
+          <div style={{ fontFamily: fonts.body, fontSize: 22, fontWeight: 600, color: onDark }}>{f("detail")}</div>
+        )}
+        {has("contact") && (
+          <div style={{ ...metaStyle(alpha(onDark, 0.8), fonts, 13), textAlign: "right" }}>{f("contact")}</div>
+        )}
+      </div>
+    </Content>
+  );
+}
+
+// ── 13. SPLIT FEATURE (photo panel + solid block) ───────────────────────────────
+// Photo on one side, a SOLID accent/ink block fills the text side (reversed
+// text), so it reads more designed than a plain intro. The block is drawn here
+// (behind the text) filling exactly the photoZone.
+function SplitFeature({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent, ink, paper, photoZone, hasPanel } = ctx;
+  const block = ink;
+  const onBlock = paper;
+  return (
+    <>
+      {/* Solid block filling the clear side (only when a panel is actually present). */}
+      {hasPanel && (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: `${photoZone.x0 - 3}%`,
+            right: `${100 - photoZone.x1}%`,
+            background: block,
+          }}
+        />
+      )}
+      <ZoneContent zone={photoZone} style={{ justifyContent: "center", padding: "0 4%", gap: 14 }}>
+        {has("eyebrow") && <div style={eyebrowStyle(lighten(accent, 0.15), fonts, 13)}>{f("eyebrow")}</div>}
+        {has("headline") && (
+          <AccentHeadline
+            text={f("headline")}
+            fonts={fonts}
+            color={onBlock}
+            accent={lighten(accent, 0.3)}
+            fontSize={56}
+            weight={fonts.headingWeight}
+            lineHeight={1.0}
+            maxWidth="100%"
+          />
+        )}
+        {has("tagline") && (
+          <div style={{ fontFamily: fonts.body, fontSize: 19, lineHeight: 1.4, color: alpha(onBlock, 0.8), marginTop: 4, maxWidth: 520 }}>
+            {f("tagline")}
+          </div>
+        )}
+        {has("brand") && (
+          <div style={{ ...metaStyle(alpha(onBlock, 0.65), fonts, 13), marginTop: 10 }}>{f("brand")}</div>
+        )}
+      </ZoneContent>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  NON-PHOTO TEMPLATES (added 2026-07-18)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── 14. ANNOUNCEMENT ────────────────────────────────────────────────────────────
+// A bold badge word ("NOW OPEN") as the hero with a supporting line + detail.
+function Announcement({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent, ink, paper } = ctx;
+  const text = ink;
+  return (
+    <Content style={{ flexDirection: "column", justifyContent: "center", alignItems: "flex-start", padding: "0 6%" }}>
+      {has("eyebrow") && (
+        <div
+          style={{
+            display: "inline-block",
+            background: accent,
+            color: readableOn(accent),
+            fontFamily: fonts.body,
+            fontWeight: 700,
+            fontSize: 15,
+            letterSpacing: "0.28em",
+            textTransform: "uppercase",
+            padding: "8px 18px",
+            borderRadius: 4,
+            marginBottom: 22,
+          }}
+        >
+          {f("eyebrow")}
+        </div>
+      )}
+      {has("headline") && (
+        <h2
+          style={{
+            fontFamily: fonts.heading,
+            fontWeight: 800,
+            fontSize: 92,
+            lineHeight: 0.9,
+            letterSpacing: "-0.03em",
+            textTransform: "uppercase",
+            color: text,
+            margin: 0,
+            maxWidth: "88%",
+          }}
+        >
+          {f("headline")}
+        </h2>
+      )}
+      {(has("tagline") || has("detail")) && (
+        <div style={{ display: "flex", gap: 28, marginTop: 22, flexWrap: "wrap" }}>
+          {has("tagline") && <div style={{ fontFamily: fonts.body, fontSize: 20, color: alpha(text, 0.8) }}>{f("tagline")}</div>}
+          {has("detail") && <div style={{ fontFamily: fonts.body, fontSize: 20, fontWeight: 600, color: darken(accent, 0.15) }}>{f("detail")}</div>}
+        </div>
+      )}
+    </Content>
+  );
+}
+
+// ── 15. TESTIMONIAL (text-only) ──────────────────────────────────────────────────
+// Giant quotation mark ghost, an italic quote, attribution. No photo needed.
+function Testimonial({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent, ink } = ctx;
+  const text = darken(ink, 0.1);
+  return (
+    <>
+      <div aria-hidden style={{ position: "absolute", left: "4%", top: "2%", fontFamily: fonts.heading, fontStyle: "italic", fontWeight: 800, fontSize: 380, lineHeight: 1, color: alpha(accent, 0.14), userSelect: "none" }}>
+        “
+      </div>
+      <Content style={{ flexDirection: "column", justifyContent: "center", padding: "0 8%" }}>
+        {has("quote") && (
+          <h2
+            style={{
+              fontFamily: fonts.heading,
+              fontStyle: "italic",
+              fontWeight: 300,
+              fontSize: 50,
+              lineHeight: 1.14,
+              letterSpacing: "-0.01em",
+              color: text,
+              margin: 0,
+              maxWidth: "82%",
+            }}
+          >
+            {f("quote")}
+          </h2>
+        )}
+        {has("attribution") && (
+          <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 26 }}>
+            <div style={{ height: 2, width: 48, background: accent }} />
+            <div style={metaStyle(alpha(text, 0.75), fonts, 14)}>{f("attribution")}</div>
+          </div>
+        )}
+      </Content>
+    </>
+  );
+}
+
+// ── 16. MENU / PRICE LIST ─────────────────────────────────────────────────────
+// A heading + up to 3 "item ..... price" rows with dotted leaders. Items are
+// parsed from the tagline: "Item | $Price" per line (or "Item - $Price").
+function MenuList({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent, ink, paper } = ctx;
+  const text = darken(ink, 0.1);
+  const rows = parseMenu(f("tagline"));
+  return (
+    <Content style={{ flexDirection: "column", justifyContent: "center", padding: "0 7%", gap: 8 }}>
+      {has("eyebrow") && <div style={{ ...eyebrowStyle(darken(accent, 0.2), fonts, 14), marginBottom: 6 }}>{f("eyebrow")}</div>}
+      {has("brand") && (
+        <h2 style={{ fontFamily: fonts.heading, fontWeight: fonts.headingWeight, fontSize: 56, lineHeight: 1, letterSpacing: "-0.02em", color: text, margin: "0 0 14px" }}>
+          {f("brand")}
+        </h2>
+      )}
+      {rows.map((r, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 12, fontFamily: fonts.body }}>
+          <span style={{ fontSize: 26, fontWeight: 500, color: text, whiteSpace: "nowrap" }}>{r.name}</span>
+          <span style={{ flex: 1, borderBottom: `2px dotted ${alpha(text, 0.3)}`, transform: "translateY(-6px)" }} />
+          <span style={{ fontSize: 26, fontWeight: 700, color: darken(accent, 0.15), whiteSpace: "nowrap" }}>{r.price}</span>
+        </div>
+      ))}
+      {has("website") && (
+        <div style={{ ...metaStyle(alpha(text, 0.6), fonts, 13), marginTop: 16 }}>{f("website")}</div>
+      )}
+    </Content>
+  );
+}
+
+// Parse "Name | $Price" or "Name - $Price" lines (up to 3) from a textarea value.
+function parseMenu(raw: string): { name: string; price: string }[] {
+  if (!raw) return [];
+  return raw
+    .split("\n")
+    .map((ln) => ln.trim())
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((ln) => {
+      const m = ln.split(/\s*[|]\s*|\s+[-–]\s+/);
+      if (m.length >= 2) return { name: m[0], price: m[m.length - 1] };
+      return { name: ln, price: "" };
+    });
+}
+
+// ── 17. COUNTDOWN / URGENCY ────────────────────────────────────────────────────
+// "2 DAYS LEFT" style urgency hero (from offer), the deal (headline), code.
+function Countdown({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent, ink, paper } = ctx;
+  const onDark = paper;
+  return (
+    <Content style={{ flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "0 5%", textAlign: "center", gap: 10 }}>
+      {has("offer") && (
+        <div
+          style={{
+            fontFamily: fonts.heading,
+            fontWeight: 800,
+            fontSize: 104,
+            lineHeight: 0.86,
+            letterSpacing: "-0.03em",
+            textTransform: "uppercase",
+            color: lighten(accent, 0.25),
+          }}
+        >
+          {f("offer")}
+        </div>
+      )}
+      {has("headline") && (
+        <div style={{ fontFamily: fonts.body, fontSize: 26, fontWeight: 600, color: onDark, maxWidth: "80%" }}>
+          {f("headline")}
+        </div>
+      )}
+      {has("promoCode") && (
+        <div style={{ marginTop: 14, display: "inline-flex", alignItems: "center", gap: 10, border: `2px dashed ${alpha(onDark, 0.5)}`, borderRadius: 8, padding: "10px 22px" }}>
+          <span style={{ ...metaStyle(alpha(onDark, 0.7), fonts, 12) }}>Code</span>
+          <span style={{ fontFamily: fonts.body, fontWeight: 800, fontSize: 22, letterSpacing: "0.16em", color: onDark }}>{f("promoCode")}</span>
+        </div>
+      )}
+    </Content>
+  );
+}
+
+// ── 18. WORDMARK (minimal) ──────────────────────────────────────────────────────
+// Brand name centered between two thin rules with a tagline. A cleaner, logo-free
+// sibling to Logo-forward.
+function Wordmark({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent, ink } = ctx;
+  const text = ink;
+  return (
+    <Content style={{ flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "0 8%", textAlign: "center" }}>
+      <div aria-hidden style={{ width: 90, height: 1, background: alpha(text, 0.4), marginBottom: 26 }} />
+      {has("brand") && (
+        <h2 style={{ fontFamily: fonts.heading, fontWeight: fonts.headingWeight, fontSize: 74, lineHeight: 1, letterSpacing: "-0.01em", color: text, margin: 0 }}>
+          {f("brand")}
+        </h2>
+      )}
+      {has("tagline") && (
+        <div style={{ ...metaStyle(alpha(text, 0.7), fonts, 14), marginTop: 18, letterSpacing: "0.42em" }}>{f("tagline")}</div>
+      )}
+      <div aria-hidden style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 26 }}>
+        <div style={{ width: 40, height: 1, background: alpha(text, 0.4) }} />
+        <div style={{ width: 7, height: 7, borderRadius: "50%", background: accent }} />
+        <div style={{ width: 40, height: 1, background: alpha(text, 0.4) }} />
+      </div>
+    </Content>
+  );
+}
+
+// ── 19. STAT / PROOF ────────────────────────────────────────────────────────────
+// One big number ("500+", "15 years") as the hero with a label + supporting line.
+function Stat({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent, ink, paper } = ctx;
+  const text = darken(ink, 0.1);
+  return (
+    <Content style={{ alignItems: "center", padding: "0 6%", gap: "4%" }}>
+      {has("offer") && (
+        <div style={{ fontFamily: fonts.heading, fontWeight: 800, fontSize: 172, lineHeight: 0.82, letterSpacing: "-0.04em", color: accent, flexShrink: 0 }}>
+          {f("offer")}
+        </div>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {has("headline") && (
+          <div style={{ fontFamily: fonts.heading, fontWeight: fonts.headingWeight, fontSize: 46, lineHeight: 1.02, letterSpacing: "-0.02em", color: text, maxWidth: 620 }}>
+            {f("headline")}
+          </div>
+        )}
+        {has("tagline") && (
+          <div style={{ fontFamily: fonts.body, fontSize: 19, lineHeight: 1.4, color: alpha(text, 0.75), maxWidth: 560 }}>{f("tagline")}</div>
+        )}
+        {has("brand") && (
+          <div style={{ ...metaStyle(alpha(text, 0.6), fonts, 13), marginTop: 6 }}>{f("brand")}</div>
+        )}
+      </div>
+    </Content>
+  );
+}
+
 // ── The registry ──────────────────────────────────────────────────────────────
 // Each entry ties the metadata + finish defaults + composition together. baseColor
 // and finishConfigs make the SAME finish look right per template.
@@ -676,6 +1171,7 @@ export const TEMPLATES: Record<TemplateId, TemplateDef & { render: (ctx: Templat
     purpose: "Set a mood — photo-forward with a single line.",
     fields: ["eyebrow", "headline", "brand", "tagline"],
     usesLogo: false,
+    photoMode: "fullbleed",
     defaultFinishes: ["scrim", "blur-blob"],
     baseColor: (c) => c.ink,
     background: (c) =>
@@ -747,14 +1243,202 @@ export const TEMPLATES: Record<TemplateId, TemplateDef & { render: (ctx: Templat
     finishConfigs: () => ({}),
     render: (ctx) => <Editorial ctx={ctx} />,
   },
+
+  // ── PHOTO TEMPLATES ──────────────────────────────────────────────────────
+  "team-intro": {
+    id: "team-intro",
+    name: "Team intro",
+    purpose: "Put a face to the name — photo on one side, intro on the other.",
+    fields: ["eyebrow", "brand", "tagline", "contact"],
+    usesLogo: false,
+    photoMode: "panel",
+    defaultFinishes: ["blur-blob"],
+    applicableFinishes: ["blur-blob", "grain", "keyline"],
+    baseColor: (c) => lighten(c.paper, 0.2),
+    background: (c) => lighten(c.paper, 0.2),
+    palette: (c) => ({ base: lighten(c.paper, 0.2) }),
+    finishConfigs: (c) => ({
+      "blur-blob": { blobColor: lighten(c.accent, 0.2), blobX: 80, blobY: 80, blobSize: 44, blobAlpha: 0.35 },
+    }),
+    render: (ctx) => <TeamIntro ctx={ctx} />,
+  },
+  "product-hero": {
+    id: "product-hero",
+    name: "Product hero",
+    purpose: "Show the product, name the price, drive the click.",
+    fields: ["eyebrow", "headline", "offer", "cta", "brand"],
+    usesLogo: false,
+    photoMode: "panel",
+    defaultFinishes: [],
+    applicableFinishes: ["blur-blob", "grain", "keyline"],
+    baseColor: (c) => lighten(c.paper, 0.25),
+    background: (c) => lighten(c.paper, 0.25),
+    palette: (c) => ({ base: lighten(c.paper, 0.25) }),
+    finishConfigs: () => ({}),
+    render: (ctx) => <ProductHero ctx={ctx} />,
+  },
+  quote: {
+    id: "quote",
+    name: "Quote",
+    purpose: "A testimonial with a face behind it — social proof.",
+    fields: ["quote", "attribution"],
+    usesLogo: false,
+    photoMode: "fullbleed",
+    defaultFinishes: ["scrim", "grain"],
+    applicableFinishes: ["scrim", "grain", "blur-blob"],
+    baseColor: (c) => c.ink,
+    background: (c) => c.ink,
+    palette: (c) => ({ base: c.ink }),
+    finishConfigs: () => ({
+      scrim: { scrimSide: "full", scrimStrength: 0.6 },
+      grain: { grainAlpha: 0.1 },
+    }),
+    render: (ctx) => <QuoteBanner ctx={ctx} />,
+  },
+  event: {
+    id: "event",
+    name: "Event",
+    purpose: "Announce a date — photo, headline, when and where.",
+    fields: ["eyebrow", "headline", "detail", "contact"],
+    usesLogo: false,
+    photoMode: "fullbleed",
+    defaultFinishes: ["scrim"],
+    applicableFinishes: ["scrim", "grain", "blur-blob"],
+    baseColor: (c) => c.ink,
+    background: (c) => c.ink,
+    palette: (c) => ({ base: c.ink }),
+    finishConfigs: () => ({
+      scrim: { scrimSide: "bottom", scrimStrength: 0.85 },
+    }),
+    render: (ctx) => <EventBanner ctx={ctx} />,
+  },
+  "split-feature": {
+    id: "split-feature",
+    name: "Split feature",
+    purpose: "Photo meets a solid color block — bold and designed.",
+    fields: ["eyebrow", "headline", "tagline", "brand"],
+    usesLogo: false,
+    photoMode: "panel",
+    defaultFinishes: [],
+    applicableFinishes: ["grain", "keyline"],
+    baseColor: (c) => c.paper,
+    background: (c) => c.paper,
+    palette: (c) => ({ base: c.paper }),
+    finishConfigs: () => ({}),
+    render: (ctx) => <SplitFeature ctx={ctx} />,
+  },
+
+  // ── NON-PHOTO TEMPLATES ──────────────────────────────────────────────────
+  announcement: {
+    id: "announcement",
+    name: "Announcement",
+    purpose: "Big news — NOW OPEN, we moved, we're hiring.",
+    fields: ["eyebrow", "headline", "tagline", "detail"],
+    usesLogo: false,
+    defaultFinishes: ["blur-blob"],
+    baseColor: (c) => lighten(c.paper, 0.2),
+    background: (c) =>
+      `radial-gradient(120% 130% at 85% 20%, ${lighten(c.accent, 0.55)} 0%, ${lighten(c.paper, 0.2)} 55%)`,
+    palette: (c) => ({ base: lighten(c.paper, 0.2) }),
+    finishConfigs: (c) => ({
+      "blur-blob": { blobColor: lighten(c.accent, 0.25), blobX: 88, blobY: 30, blobSize: 50, blobAlpha: 0.4 },
+    }),
+    render: (ctx) => <Announcement ctx={ctx} />,
+  },
+  testimonial: {
+    id: "testimonial",
+    name: "Testimonial",
+    purpose: "A customer quote, text-only — no photo needed.",
+    fields: ["quote", "attribution"],
+    usesLogo: false,
+    defaultFinishes: ["keyline"],
+    baseColor: (c) => lighten(c.paper, 0.25),
+    background: (c) => lighten(c.paper, 0.25),
+    palette: (c) => ({ base: lighten(c.paper, 0.25) }),
+    finishConfigs: (c) => ({ keyline: { keyColor: alpha(c.accent, 0.3), keyInset: 3 } }),
+    render: (ctx) => <Testimonial ctx={ctx} />,
+  },
+  menu: {
+    id: "menu",
+    name: "Menu / prices",
+    purpose: "A short price list — services and what they cost.",
+    fields: ["eyebrow", "brand", "tagline", "website"],
+    usesLogo: false,
+    defaultFinishes: [],
+    baseColor: (c) => c.paper,
+    background: (c) => c.paper,
+    palette: (c) => ({ base: c.paper }),
+    finishConfigs: () => ({}),
+    render: (ctx) => <MenuList ctx={ctx} />,
+  },
+  countdown: {
+    id: "countdown",
+    name: "Countdown",
+    purpose: "Urgency — days left, the deal, the code.",
+    fields: ["offer", "headline", "promoCode"],
+    usesLogo: false,
+    defaultFinishes: ["ghost-text", "grain"],
+    baseColor: (c) => c.ink,
+    background: (c) =>
+      `radial-gradient(120% 140% at 50% 20%, ${lighten(c.ink, 0.18)} 0%, ${c.ink} 55%, ${darken(c.ink, 0.2)} 100%)`,
+    palette: (c) => ({ base: c.ink }),
+    finishConfigs: (c) => ({
+      "ghost-text": { ghostText: c.f("offer").split(" ")[0] || "48", ghostSize: 420, ghostAlpha: 0.06, ghostAlign: "right", ghostX: -6, ghostFont: c.fonts.heading },
+      grain: { grainAlpha: 0.08 },
+    }),
+    render: (ctx) => <Countdown ctx={ctx} />,
+  },
+  wordmark: {
+    id: "wordmark",
+    name: "Wordmark",
+    purpose: "Just the name — clean, centered, refined.",
+    fields: ["brand", "tagline"],
+    usesLogo: false,
+    defaultFinishes: [],
+    baseColor: (c) => lighten(c.paper, 0.25),
+    background: (c) => lighten(c.paper, 0.25),
+    palette: (c) => ({ base: lighten(c.paper, 0.25) }),
+    finishConfigs: () => ({}),
+    render: (ctx) => <Wordmark ctx={ctx} />,
+  },
+  stat: {
+    id: "stat",
+    name: "Stat / proof",
+    purpose: "Lead with a number — 500+ clients, 15 years.",
+    fields: ["offer", "headline", "tagline", "brand"],
+    usesLogo: false,
+    defaultFinishes: ["blur-blob"],
+    baseColor: (c) => lighten(c.paper, 0.2),
+    background: (c) => lighten(c.paper, 0.2),
+    palette: (c) => ({ base: lighten(c.paper, 0.2) }),
+    finishConfigs: (c) => ({
+      "blur-blob": { blobColor: lighten(c.accent, 0.2), blobX: 20, blobY: 70, blobSize: 42, blobAlpha: 0.3 },
+    }),
+    render: (ctx) => <Stat ctx={ctx} />,
+  },
 };
 
 export const TEMPLATE_LIST: TemplateId[] = [
-  "promotion",
-  "cta",
-  "credential",
+  // Photo-forward first — the newest, most-wanted capability leads the gallery.
+  "team-intro",
+  "product-hero",
+  "quote",
+  "event",
+  "split-feature",
   "brand-story",
+  // Promo / action
+  "promotion",
+  "countdown",
+  "cta",
+  "announcement",
+  // Proof / credibility
+  "testimonial",
+  "stat",
+  "credential",
+  "menu",
+  // Brand / typographic
   "logo",
+  "wordmark",
   "typographic",
   "color-blocked",
   "editorial",

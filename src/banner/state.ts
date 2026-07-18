@@ -14,11 +14,13 @@ import {
   PLATFORMS,
   activeFinishes,
   activeTemplateId,
+  DEFAULT_PHOTO,
   type BannerState,
   type FieldKey,
   type FinishKind,
   type PlatformId,
   type TemplateId,
+  type PhotoSpec,
 } from "./model";
 import { getTemplate } from "./templates";
 
@@ -32,6 +34,7 @@ export type BannerAction =
   | { type: "toggleFinish"; kind: FinishKind }
   | { type: "moveFinish"; kind: FinishKind; dir: -1 | 1 }
   | { type: "resetFinishes" }
+  | { type: "patchPhoto"; patch: Partial<PhotoSpec> }
   | { type: "reset" };
 
 const VALID_FINISHES = new Set(FINISHES.map((f) => f.kind));
@@ -78,12 +81,26 @@ export function hydrate(saved: Partial<BannerState> & { templateId?: TemplateId;
     twitter: cleanFinishes(s.platformFinishes?.twitter ?? s.finishes, DEFAULT_PLATFORM_FINISHES.twitter),
   };
 
+  // Photo — merge a (possibly partial / absent) saved photo onto the default so
+  // every field is present. Old blobs with no photo reopen with the default.
+  const photo: PhotoSpec = { ...DEFAULT_PHOTO };
+  if (s.photo && typeof s.photo === "object") {
+    const p = s.photo as Partial<PhotoSpec>;
+    if (typeof p.dataUrl === "string" || p.dataUrl === null) photo.dataUrl = p.dataUrl;
+    if (p.side === "left" || p.side === "right") photo.side = p.side;
+    if (p.divider === "straight" || p.divider === "diagonal" || p.divider === "curve") photo.divider = p.divider;
+    if (typeof p.zoom === "number" && isFinite(p.zoom)) photo.zoom = Math.min(2.5, Math.max(1, p.zoom));
+    if (typeof p.focusX === "number" && isFinite(p.focusX)) photo.focusX = Math.min(1, Math.max(0, p.focusX));
+    if (typeof p.focusY === "number" && isFinite(p.focusY)) photo.focusY = Math.min(1, Math.max(0, p.focusY));
+  }
+
   return {
     ...bannerInitial,
     ...s,
     templates,
     platformFinishes,
     fields,
+    photo,
     platform: PLATFORM_IDS.includes(s.platform as PlatformId) ? (s.platform as PlatformId) : "facebook",
   };
 }
@@ -127,8 +144,10 @@ export function bannerReducer(s: BannerState, a: BannerAction): BannerState {
     }
     case "resetFinishes":
       return setActiveFinishes(s, [...getTemplate(activeTemplateId(s)).defaultFinishes]);
+    case "patchPhoto":
+      return { ...s, photo: { ...s.photo, ...a.patch } };
     case "reset":
-      return { ...bannerInitial };
+      return { ...bannerInitial, photo: { ...DEFAULT_PHOTO } };
   }
 }
 

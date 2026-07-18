@@ -10,6 +10,7 @@ import {
   Popconfirm,
   Segmented,
   Select,
+  Slider,
   Space,
   Tooltip,
   Typography,
@@ -48,7 +49,8 @@ import {
   looksLikeBanner,
 } from "./state";
 import { TEMPLATE_LIST, getTemplate, applicableFinishesFor } from "./templates";
-import { BannerPreview, BannerNode } from "./BannerCanvas";
+import { BannerSmartPreview, BannerNode, scaledLayerStyle } from "./BannerCanvas";
+import { loadPhotoFile, resizePhotoDataUrl, photoNeedsResize } from "./photo";
 import { BannerThumb } from "./BannerThumb";
 import { renderPlatformAsset } from "./render-offscreen";
 import { dataUrlToBlob } from "./export";
@@ -175,6 +177,203 @@ function FinishStackControl({
   );
 }
 
+// ── Photo focus pad: drag a dot to set the focal point (focusX/focusY) ────────
+// A square preview of the photo with a draggable dot. Dragging sets focusX/Y in
+// 0..1 via pointer events on window (so the drag continues outside the pad).
+function PhotoFocusPad({
+  dataUrl,
+  focusX,
+  focusY,
+  onChange,
+}: {
+  dataUrl: string;
+  focusX: number;
+  focusY: number;
+  onChange: (x: number, y: number) => void;
+}) {
+  const padRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
+
+  useEffect(() => {
+    function setFromEvent(e: PointerEvent) {
+      const el = padRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+      const y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+      onChange(Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000);
+    }
+    function move(e: PointerEvent) {
+      if (draggingRef.current) setFromEvent(e);
+    }
+    function up() {
+      draggingRef.current = false;
+    }
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, [onChange]);
+
+  return (
+    <div>
+      <div
+        ref={padRef}
+        onPointerDown={(e) => {
+          draggingRef.current = true;
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+          const y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+          onChange(Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000);
+        }}
+        style={{
+          position: "relative",
+          width: 132,
+          height: 132,
+          borderRadius: 10,
+          border: "1px solid #d9e5e0",
+          overflow: "hidden",
+          cursor: "crosshair",
+          touchAction: "none",
+          userSelect: "none",
+        }}
+      >
+        {/* A real <img> (not background-image) downsamples most cleanly in the
+            browser, so the pad stays crisp even for a large source photo. */}
+        <img
+          src={dataUrl}
+          alt=""
+          draggable={false}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: "center",
+            pointerEvents: "none",
+            userSelect: "none",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            left: `${focusX * 100}%`,
+            top: `${focusY * 100}%`,
+            width: 22,
+            height: 22,
+            transform: "translate(-50%, -50%)",
+            borderRadius: "50%",
+            border: "3px solid #fff",
+            boxShadow: "0 0 0 1.5px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.35)",
+            pointerEvents: "none",
+          }}
+        />
+      </div>
+      <Typography.Text type="secondary" style={{ fontSize: 11, display: "block", marginTop: 6, maxWidth: 200 }}>
+        Drag the dot onto what you want kept in frame — put it on the face, then set zoom.
+      </Typography.Text>
+    </div>
+  );
+}
+
+// ── Photo controls: upload + side/divider/zoom/focal (shown for photo templates)
+function PhotoControls({
+  photo,
+  mode,
+  onUpload,
+  onRemove,
+  onPatch,
+}: {
+  photo: BannerState["photo"];
+  mode: "panel" | "fullbleed";
+  onUpload: (file: File) => void;
+  onRemove: () => void;
+  onPatch: (patch: Partial<BannerState["photo"]>) => void;
+}) {
+  const uploadProps: UploadProps = {
+    accept: "image/png,image/jpeg,image/webp",
+    showUploadList: false,
+    beforeUpload: (file) => {
+      onUpload(file);
+      return false;
+    },
+  };
+  return (
+    <Space direction="vertical" size={14} style={{ width: "100%" }}>
+      <Space>
+        <Upload {...uploadProps}>
+          <Button icon={<InboxOutlined />}>{photo.dataUrl ? "Replace photo" : "Upload photo"}</Button>
+        </Upload>
+        {photo.dataUrl && (
+          <Button type="link" onClick={onRemove}>
+            Remove
+          </Button>
+        )}
+      </Space>
+      {!photo.dataUrl && (
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          {mode === "panel"
+            ? "Upload a person or product photo — it carves into one side of the banner."
+            : "Upload a photo — it fills the banner behind your text."}
+        </Typography.Text>
+      )}
+
+      {photo.dataUrl && (
+        <>
+          {/* Side + divider only matter for the carved panel layout. */}
+          {mode === "panel" && (
+            <>
+              <LabeledField label="Photo side">
+                <Segmented
+                  block
+                  value={photo.side}
+                  onChange={(v) => onPatch({ side: v as "left" | "right" })}
+                  options={[
+                    { label: "Left", value: "left" },
+                    { label: "Right", value: "right" },
+                  ]}
+                />
+              </LabeledField>
+              <LabeledField label="Divider shape">
+                <Segmented
+                  block
+                  value={photo.divider}
+                  onChange={(v) => onPatch({ divider: v as BannerState["photo"]["divider"] })}
+                  options={[
+                    { label: "Straight", value: "straight" },
+                    { label: "Diagonal", value: "diagonal" },
+                    { label: "Curve", value: "curve" },
+                  ]}
+                />
+              </LabeledField>
+            </>
+          )}
+          <LabeledField label="Zoom">
+            <Slider
+              min={100}
+              max={250}
+              value={Math.round(photo.zoom * 100)}
+              tooltip={{ formatter: (v) => `${v}%` }}
+              onChange={(v) => onPatch({ zoom: (v as number) / 100 })}
+            />
+          </LabeledField>
+          <LabeledField label="Position">
+            <PhotoFocusPad
+              dataUrl={photo.dataUrl}
+              focusX={photo.focusX}
+              focusY={photo.focusY}
+              onChange={(x, y) => onPatch({ focusX: x, focusY: y })}
+            />
+          </LabeledField>
+        </>
+      )}
+    </Space>
+  );
+}
+
 // ── Template strip: a horizontal, scrollable gallery (like Signature Studio) ──
 // Sits at the top, full width, so it's out of the way and can grow past 8. Each
 // card previews the REAL composition and is scoped to the ACTIVE platform.
@@ -293,30 +492,11 @@ function PlatformFilmstrip({
   );
 }
 
-// A tiny live thumbnail of a specific platform's current design (its own ratio).
+// A tiny thumbnail of a specific platform's current design (its own ratio).
+// Uses the smart preview so a photo design is the smooth export bitmap, not a
+// hard DOM downscale (which mottles worst at thumbnail size).
 function BannerNodeThumb({ state }: { state: BannerState }) {
-  const p = PLATFORMS.find((x) => x.id === state.platform)!;
-  const wrap = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0.08);
-  useEffect(() => {
-    const el = wrap.current;
-    if (!el) return;
-    const measure = () => {
-      const w = el.clientWidth;
-      if (w > 0) setScale(w / p.w);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [p.w]);
-  return (
-    <div ref={wrap} style={{ width: "100%", aspectRatio: `${p.w} / ${p.h}`, position: "relative", borderRadius: 5, overflow: "hidden" }}>
-      <div style={{ position: "absolute", top: 0, left: 0, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-        <BannerNode state={state} />
-      </div>
-    </div>
-  );
+  return <BannerSmartPreview state={state} radius={5} shadow={false} />;
 }
 
 // ── The panel ─────────────────────────────────────────────────────────────────
@@ -329,12 +509,46 @@ export function BannerPanel() {
 
   const activeId = activeTemplateId(state);
   const tpl = getTemplate(activeId);
+  const photoMode = tpl.photoMode ?? "none";
   const platformDef = PLATFORMS.find((p) => p.id === state.platform)!;
+
+  async function onPhotoUpload(file: File) {
+    try {
+      const dataUrl = await loadPhotoFile(file);
+      dispatch({ type: "patchPhoto", patch: { dataUrl } });
+    } catch {
+      message.error("Could not read that image");
+    }
+  }
 
   // Load the design's font pairing so previews draw with it (idempotent).
   useEffect(() => {
     loadPairing(getPairing(state.fontId));
   }, [state.fontId]);
+
+  // Migrate an oversized stored photo (uploaded before the resize existed) down
+  // to the high-quality capped version — so the focus pad and every raw-source
+  // surface stays crisp WITHOUT the user re-uploading. Runs once per distinct
+  // photo; the resize is idempotent (already-small photos are left untouched).
+  const migratedPhotoRef = useRef<string | null>(null);
+  useEffect(() => {
+    const url = state.photo.dataUrl;
+    if (!url || migratedPhotoRef.current === url) return;
+    let cancelled = false;
+    (async () => {
+      if (!(await photoNeedsResize(url))) {
+        migratedPhotoRef.current = url;
+        return;
+      }
+      const resized = await resizePhotoDataUrl(url);
+      if (cancelled || resized === url) return;
+      migratedPhotoRef.current = resized;
+      dispatch({ type: "patchPhoto", patch: { dataUrl: resized } });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [state.photo.dataUrl]);
 
   const logoUpload: UploadProps = {
     accept: "image/png,image/jpeg,image/svg+xml",
@@ -542,6 +756,19 @@ export function BannerPanel() {
             </Space>
           </SectionCard>
 
+          {/* Photo — only for templates that use one (panel or full-bleed). */}
+          {photoMode !== "none" && (
+            <SectionCard title="Photo" collapsible>
+              <PhotoControls
+                photo={state.photo}
+                mode={photoMode}
+                onUpload={onPhotoUpload}
+                onRemove={() => dispatch({ type: "patchPhoto", patch: { dataUrl: null } })}
+                onPatch={(patch) => dispatch({ type: "patchPhoto", patch })}
+              />
+            </SectionCard>
+          )}
+
           {/* 2. Palette */}
           <SectionCard title="2. Colors" collapsible>
             <Space direction="vertical" size={12} style={{ width: "100%" }}>
@@ -579,7 +806,7 @@ export function BannerPanel() {
                   onChange={(v) => dispatch({ type: "setPlatform", id: v as PlatformId })}
                   options={PLATFORMS.map((p) => ({ label: p.label, value: p.id }))}
                 />
-                <BannerPreview state={state} />
+                <BannerSmartPreview state={state} />
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                   {`${platformDef.w} × ${platformDef.h} — exports at full resolution.`}
                 </Typography.Text>

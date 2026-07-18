@@ -9,9 +9,10 @@ import {
   heaviestWeight,
   lightestWeight,
 } from "@/lib/shared-fonts";
-import type { FieldKey, FinishKind, BannerState, TemplateId } from "./model";
+import type { FieldKey, FinishKind, BannerState, TemplateId, PhotoSpec, PhotoMode } from "./model";
 import { activeFinishes } from "./model";
 import type { FinishConfig, FinishPalette } from "./finishes";
+import { photoTextZone } from "./photo";
 
 export interface ResolvedFonts {
   heading: string; // css font-family stack
@@ -44,11 +45,21 @@ export interface TemplateContext {
   finishes: FinishKind[];
   /** True when the user has the seam-gradient headline treatment active. */
   seam: boolean;
+  /** The shared photo spec (dataUrl may be null). */
+  photo: PhotoSpec;
+  /** True when this template uses a carved side panel AND a photo is present. */
+  hasPanel: boolean;
+  /** The clear text zone {x0,x1} in % when a side panel is active, else full
+   *  width {0,100}. A template positions its copy inside this so text never
+   *  overlaps the photo. */
+  photoZone: { x0: number; x1: number };
 }
 
-export function buildContext(state: BannerState): TemplateContext {
+export function buildContext(state: BannerState, photoMode: PhotoMode = "none"): TemplateContext {
   const get = (key: FieldKey) => (state.fields[key] ?? "").trim();
   const finishes = activeFinishes(state);
+  const hasPanel = photoMode === "panel" && !!state.photo.dataUrl;
+  const photoZone = hasPanel ? photoTextZone(state.photo) : { x0: 0, x1: 100 };
   return {
     f: get,
     has: (key) => get(key).length > 0,
@@ -59,6 +70,9 @@ export function buildContext(state: BannerState): TemplateContext {
     paper: state.paper,
     finishes,
     seam: finishes.includes("seam-gradient"),
+    photo: state.photo,
+    hasPanel,
+    photoZone,
   };
 }
 
@@ -72,6 +86,10 @@ export interface TemplateDef {
   fields: FieldKey[];
   /** Whether this template uses the logo upload. */
   usesLogo: boolean;
+  /** How this template consumes the shared photo: a carved side panel, a
+   *  full-bleed background, or none. Drives whether the Photo control shows and
+   *  whether the render node paints the photo. Defaults to "none". */
+  photoMode?: PhotoMode;
   /** The finish stack a fresh pick of this template gets. */
   defaultFinishes: FinishKind[];
   /** The finishes that VISIBLY do something on this template — the only ones the
