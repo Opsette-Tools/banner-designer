@@ -57,6 +57,7 @@ import { BannerThumb } from "./BannerThumb";
 import { renderPlatformAsset } from "./render-offscreen";
 import { dataUrlToBlob } from "./export";
 import { buildCombinedExport } from "@/lib/icon-kit/export-assets";
+import { isEmbedded } from "@/lib/opsette-kit-link";
 import { downloadBlob } from "@/lib/icon-kit/download";
 import { fromSocialKitJson, configForTab } from "@/lib/icon-kit/brand-kit";
 import { FONT_PAIRINGS, cssFamily, pairingLabel, loadPairing, getPairing } from "@/lib/shared-fonts";
@@ -606,6 +607,12 @@ function BannerNodeThumb({ state }: { state: BannerState }) {
 
 // ── The panel ─────────────────────────────────────────────────────────────────
 export function BannerPanel() {
+  // Running inside the Brand Board iframe drawer? Then the clipboard "Export to
+  // Brand Board" button is both redundant AND broken — a sandboxed iframe can't
+  // write the clipboard, and the drawer's own "Save to Brand Board" bar already
+  // posts the identical blob back via postMessage. So hide the clipboard export
+  // when embedded; it stays for the standalone tool where clipboard IS the path.
+  const embedded = useMemo(() => isEmbedded(), []);
   const [state, dispatch] = usePersistentReducer(BANNER_KEY, bannerReducer, bannerInitial, hydrate);
   const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
@@ -937,9 +944,11 @@ export function BannerPanel() {
             </SectionCard>
 
             <Space direction="vertical" size={8} style={{ width: "100%" }}>
-              <Button icon={<ExportOutlined />} size="large" loading={busy} onClick={exportToBoard} block>
-                Export to Brand Board
-              </Button>
+              {!embedded && (
+                <Button icon={<ExportOutlined />} size="large" loading={busy} onClick={exportToBoard} block>
+                  Export to Brand Board
+                </Button>
+              )}
               <Button icon={<DownloadOutlined />} size="large" loading={busy} onClick={downloadCurrent} block type="primary">
                 Download this size (PNG)
               </Button>
