@@ -1,0 +1,303 @@
+/* Banner Designer — base styles.
+   No Tailwind: the UI is Ant Design. This file carries only a minimal reset,
+   the app background, and the layout/section-card classes the builder uses. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background-color: #f4f6f5;
+  color: #1c332c;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Builder: wide two-column layout ─────────────────────────────────────────
+   Controls on the left, preview pinned on the right so the design stays in view
+   while building. Single stacked column on mobile — the preview moves ABOVE the
+   controls so a phone user sees the banner first, then scrolls to edit. */
+.banner-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.banner-preview-col {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+@media (max-width: 900px) {
+  .banner-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* On a phone, put the live banner FIRST — it's the thing you're judging. */
+  .banner-controls-col {
+    order: 2;
+  }
+  .banner-preview-col {
+    order: 1;
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+    padding-right: 0;
+  }
+}
+
+/* ── Template gallery: visual thumbnail cards (not text tabs) ─────────────────*/
+.banner-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 520px) {
+  .banner-gallery {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.banner-tpl-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px;
+  border: 1.5px solid #e2ebe7;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+.banner-tpl-card:hover {
+  border-color: #b9d0c6;
+  box-shadow: 0 4px 14px -8px rgba(23, 51, 44, 0.3);
+}
+.banner-tpl-card.is-selected {
+  border-color: #2f4f46;
+  box-shadow: 0 0 0 2px rgba(47, 79, 70, 0.18);
+}
+.banner-tpl-meta {
+  padding: 8px 4px 2px;
+}
+.banner-tpl-meta strong {
+  display: block;
+  font-size: 13px;
+  color: #1c332c;
+}
+.banner-tpl-meta span {
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: #6d857b;
+  margin-top: 2px;
+}
+
+/* ── Template strip: horizontal, scrollable gallery at the top ────────────────
+   Adapted from Signature Studio's TemplateStrip. Full width above the split so
+   it's out of the way; grows past 8 templates by scrolling, not stacking. */
+.tpl-strip {
+  background: #fff;
+  border: 1px solid #d9e5e0;
+  border-radius: 12px;
+  padding: 12px 12px 14px;
+  box-shadow: 0 1px 2px rgba(23, 51, 44, 0.04);
+  margin-bottom: 16px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+.tpl-strip__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 0 2px 10px;
+}
+.tpl-strip__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1c332c;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.tpl-strip__sub {
+  font-size: 12.5px;
+  color: #6d857b;
+}
+.tpl-strip__sub strong {
+  color: #2f4f46;
+}
+.tpl-strip__body {
+  position: relative;
+  min-width: 0;
+}
+.tpl-strip__nav {
+  position: absolute;
+  top: 44%;
+  transform: translateY(-50%);
+  z-index: 2;
+  background: #fff !important;
+  box-shadow: 0 4px 12px -4px rgba(20, 20, 40, 0.28);
+}
+.tpl-strip__nav--left {
+  left: -8px;
+}
+.tpl-strip__nav--right {
+  right: -8px;
+}
+@media (hover: none), (pointer: coarse) {
+  .tpl-strip__nav {
+    display: none;
+  }
+}
+.tpl-strip__track {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 6px 8px;
+  margin: 0 -6px;
+  min-width: 0;
+}
+.tpl-strip__track::-webkit-scrollbar {
+  height: 6px;
+}
+.tpl-strip__track::-webkit-scrollbar-thumb {
+  background: #c4d5cd;
+  border-radius: 3px;
+}
+.tpl-strip__card {
+  flex: 0 0 auto;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #fff;
+  border: 1.5px solid #e2ebe7;
+  border-radius: 10px;
+  padding: 6px;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.tpl-strip__card:hover {
+  border-color: #b9d0c6;
+  box-shadow: 0 4px 14px -8px rgba(23, 51, 44, 0.3);
+}
+.tpl-strip__card.is-selected {
+  border-color: #2f4f46;
+  box-shadow: 0 0 0 2px rgba(47, 79, 70, 0.18);
+}
+.tpl-strip__name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1c332c;
+  padding: 0 2px 2px;
+}
+
+/* ── All-sizes filmstrip: every platform's assigned template at a glance ──────*/
+.size-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.size-strip__card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 5px;
+  border: 1.5px solid #e2ebe7;
+  border-radius: 9px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.size-strip__card:hover {
+  border-color: #b9d0c6;
+}
+.size-strip__card.is-active {
+  border-color: #2f4f46;
+  box-shadow: 0 0 0 2px rgba(47, 79, 70, 0.16);
+}
+.size-strip__thumb {
+  width: 100%;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #f0f4f2;
+}
+.size-strip__meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 3px 2px;
+}
+.size-strip__platform {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #1c332c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.size-strip__tpl {
+  font-size: 10.5px;
+  color: #7c9389;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Section cards: make one group visibly distinct from the next ─────────────
+   The builder is a stack of numbered sections. We give every section header a
+   tinted band + an accent left-edge so each block reads as its own panel. */
+.ops-section-card {
+  border: 1px solid #d9e5e0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(23, 51, 44, 0.04);
+}
+.ops-section-card > .ant-card-head {
+  background: linear-gradient(180deg, #f2f8f5 0%, #eaf3ef 100%);
+  border-bottom: 1px solid #d9e5e0;
+  border-left: 3px solid #2f4f46;
+  min-height: 44px;
+}
+.ops-section-card > .ant-card-head .ant-card-head-title {
+  font-weight: 600;
+  color: #1c332c;
+}
+.ops-section-card.ops-collapsible > .ant-card-head {
+  cursor: pointer;
+  user-select: none;
+}
+.ops-section-card.ops-collapsible > .ant-card-head:hover {
+  background: linear-gradient(180deg, #ecf5f0 0%, #e2efe9 100%);
+}
+.ops-section-card.ops-section-primary {
+  border-color: #2f4f46;
+}
+.ops-section-card.ops-section-primary > .ant-card-head {
+  border-left-width: 4px;
+}
+
+.ops-collapse-chevron {
+  transition: transform 0.2s ease;
+  color: #5a7268;
+}
+.ops-collapse-chevron.ops-open {
+  transform: rotate(90deg);
+}
