@@ -84,7 +84,7 @@ export async function renderPlatformAsset(
       root.render(createElement(BannerNode, { state: scoped, ref }));
     });
     await nextFrame();
-    const image = await nodeToDataUrl(node, scoped);
+    const image = await nodeToDataUrl(node);
     return {
       image,
       label: platform.boardLabel,
