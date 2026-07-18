@@ -92,6 +92,32 @@ function AccentHeadline({
       </h2>
     );
   }
+  const accentSpan: CSSProperties = {
+    color: accent,
+    fontStyle: italicAccent ? "italic" : "normal",
+    fontWeight: italicAccent ? 400 : (weight ?? fonts.headingWeight),
+  };
+
+  // Explicit accent marker: wrap the pivot word(s) in *asterisks* to accent them
+  // ANYWHERE in the line (e.g. "a season *of* health and rest"), not just the
+  // last word. If no marker is present, fall back to accenting the last word.
+  if (text.includes("*")) {
+    const parts = text.split(/\*([^*]+)\*/); // [before, accented, after, accented, ...]
+    return (
+      <h2 style={{ ...base, color }}>
+        {parts.map((part, i) =>
+          i % 2 === 1 ? (
+            <span key={i} style={accentSpan}>
+              {part}
+            </span>
+          ) : (
+            <span key={i}>{part}</span>
+          ),
+        )}
+      </h2>
+    );
+  }
+
   // Accent the last word.
   const words = text.split(" ");
   if (words.length < 2) {
@@ -104,15 +130,7 @@ function AccentHeadline({
   return (
     <h2 style={{ ...base, color }}>
       {head}{" "}
-      <span
-        style={{
-          color: accent,
-          fontStyle: italicAccent ? "italic" : "normal",
-          fontWeight: italicAccent ? 400 : (weight ?? fonts.headingWeight),
-        }}
-      >
-        {last}
-      </span>
+      <span style={accentSpan}>{last}</span>
     </h2>
   );
 }
@@ -1088,6 +1106,393 @@ function Stat({ ctx }: { ctx: TemplateContext }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  WAVE 2 TEMPLATES (added 2026-07-18)
+//  From Lovable provider-kit mockups Ruthnie liked. Data-driven, hand-built —
+//  no Lovable round-trip. Common threads: rounded photo crops, italic-accent
+//  last word, big ghost numerals/marks, gold-on-deep meta.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// A small gold star row (five filled stars) — used by the bold testimonial.
+function StarRow({ color, size = 26 }: { color: string; size?: number }) {
+  return (
+    <div aria-hidden style={{ display: "flex", gap: size * 0.24 }}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <svg key={i} width={size} height={size} viewBox="0 0 24 24" fill={color}>
+          <path d="M12 2l2.9 6.2 6.8.7-5.1 4.6 1.5 6.7L12 17.8 5.9 20.2l1.5-6.7L2.3 8.9l6.8-.7L12 2z" />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
+// ── 20. PROVIDER PROFILE (photo panel, rounded inset) ───────────────────────────
+// Rounded-rectangle photo floated on a deep gradient panel; eyebrow, a big serif
+// name with an italic-accent credential (Offer), two meta lines + an accent rule.
+function ProviderProfile({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent, ink, paper, photoZone } = ctx;
+  const onDark = paper;
+  const gold = lighten(accent, 0.2);
+  const cred = f("offer"); // the credential ("FNP-BC") rides in Offer
+  const padLeft = ctx.photo.side === "left" ? "4%" : "5%";
+  return (
+    <ZoneContent zone={photoZone} style={{ justifyContent: "center", paddingLeft: padLeft, paddingRight: "5%", gap: 14 }}>
+      {has("eyebrow") && <div style={eyebrowStyle(gold, fonts, 14)}>{f("eyebrow")}</div>}
+      {has("brand") && (
+        <h2
+          style={{
+            fontFamily: fonts.heading,
+            fontWeight: fonts.headingWeight,
+            fontSize: 66,
+            lineHeight: 0.98,
+            letterSpacing: "-0.02em",
+            color: onDark,
+            margin: 0,
+          }}
+        >
+          {f("brand")}
+          {cred && (
+            <span style={{ fontStyle: "italic", fontWeight: 400, color: gold }}>, {cred}</span>
+          )}
+        </h2>
+      )}
+      {has("tagline") && (
+        <div style={{ fontFamily: fonts.body, fontSize: 20, lineHeight: 1.4, color: alpha(onDark, 0.82), maxWidth: 520, marginTop: 2 }}>
+          {f("tagline")}
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 10 }}>
+        <div style={{ height: 2, width: 54, background: accent, flexShrink: 0 }} />
+        {has("contact") && <div style={metaStyle(alpha(onDark, 0.7), fonts, 13)}>{f("contact")}</div>}
+      </div>
+    </ZoneContent>
+  );
+}
+
+// ── 21. TESTIMONIAL (bold) ──────────────────────────────────────────────────────
+// A giant faint quote-mark top-left, a very large multi-line serif quote hero, a
+// 5-gold-star row + small attribution bottom-left, brand bottom-right, pale card.
+function TestimonialBold({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent, ink } = ctx;
+  const text = darken(ink, 0.1);
+  const gold = darken(accent, 0.08);
+  return (
+    <>
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          left: "3%",
+          top: "-6%",
+          fontFamily: fonts.heading,
+          fontWeight: 800,
+          fontSize: 460,
+          lineHeight: 1,
+          color: alpha(accent, 0.16),
+          userSelect: "none",
+        }}
+      >
+        “
+      </div>
+      <Content style={{ flexDirection: "column", justifyContent: "center", padding: "6% 7%" }}>
+        {has("quote") && (
+          <h2
+            style={{
+              fontFamily: fonts.heading,
+              fontWeight: 400,
+              fontSize: 62,
+              lineHeight: 1.08,
+              letterSpacing: "-0.02em",
+              color: text,
+              margin: 0,
+              maxWidth: "86%",
+            }}
+          >
+            {f("quote")}
+          </h2>
+        )}
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 24, marginTop: 34 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <StarRow color={gold} size={30} />
+            {has("attribution") && <div style={metaStyle(alpha(text, 0.7), fonts, 14)}>{f("attribution")}</div>}
+          </div>
+          {has("brand") && (
+            <div style={{ fontFamily: fonts.heading, fontStyle: "italic", fontSize: 26, color: alpha(text, 0.8), whiteSpace: "nowrap" }}>
+              {f("brand")}
+            </div>
+          )}
+        </div>
+      </Content>
+    </>
+  );
+}
+
+// ── 22. HOW IT WORKS / STEPS (2–4) ───────────────────────────────────────────────
+// Deep panel with big faint numerals across a connecting hairline, each with a
+// bold step title + a line of copy. Driven by the structured `steps` list (a real
+// add/remove editor in the sidebar), so the layout adapts to 2, 3, or 4 columns.
+function HowItWorks({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent, ink, paper } = ctx;
+  const onDark = paper;
+  const gold = lighten(accent, 0.2);
+  const steps = ctx.steps.slice(0, 4);
+  const n = Math.max(1, steps.length);
+  // Step type down a notch when the row gets crowded (4 columns) so it stays
+  // readable at every column count.
+  const numSize = n >= 4 ? 78 : 96;
+  const titleSize = n >= 4 ? 26 : 30;
+  const bodySize = n >= 4 ? 15 : 17;
+  return (
+    <Content style={{ flexDirection: "column", justifyContent: "center", padding: "0 6%", gap: 34 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {has("eyebrow") && <div style={eyebrowStyle(gold, fonts, 14)}>{f("eyebrow")}</div>}
+        {has("brand") && (
+          <h2 style={{ fontFamily: fonts.heading, fontWeight: fonts.headingWeight, fontSize: 46, lineHeight: 1, letterSpacing: "-0.02em", color: onDark, margin: 0 }}>
+            {f("brand")}
+          </h2>
+        )}
+      </div>
+      <div style={{ position: "relative", display: "grid", gridTemplateColumns: `repeat(${n}, 1fr)`, gap: "4%", alignItems: "start" }}>
+        {/* connecting hairline behind the numerals — only spans between steps, so a
+            2-step row doesn't trail a lonely line off the right edge. */}
+        {n > 1 && (
+          <div aria-hidden style={{ position: "absolute", left: `${100 / n / 2}%`, right: `${100 / n / 2}%`, top: numSize * 0.42, height: 1, background: alpha(onDark, 0.25) }} />
+        )}
+        {steps.map((s, i) => (
+          <div key={i} style={{ position: "relative", display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ fontFamily: fonts.heading, fontWeight: 800, fontSize: numSize, lineHeight: 0.8, color: alpha(gold, 0.55) }}>
+              {String(i + 1).padStart(2, "0")}
+            </div>
+            <div style={{ fontFamily: fonts.heading, fontWeight: fonts.headingWeight, fontSize: titleSize, lineHeight: 1.05, color: onDark, marginTop: 4 }}>
+              {s.title}
+            </div>
+            {s.body && (
+              <div style={{ fontFamily: fonts.body, fontSize: bodySize, lineHeight: 1.4, color: alpha(onDark, 0.75) }}>{s.body}</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </Content>
+  );
+}
+
+// ── 23. LOCAL PRIDE ─────────────────────────────────────────────────────────────
+// A big map-pin glyph watermark on one side, brand eyebrow, and a huge serif
+// lead-in ("Proudly caring for") with the LOCATION as the italic-accent place —
+// the location is its own field, so the "local" premise is real and store-able.
+function LocalPride({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent, ink } = ctx;
+  const text = ink;
+  const lead = f("headline"); // "Proudly caring for"
+  const place = f("location"); // "Portland"
+  return (
+    <>
+      {/* map-pin watermark, right side */}
+      <div aria-hidden style={{ position: "absolute", right: "-2%", top: "50%", transform: "translateY(-50%)", opacity: 0.1 }}>
+        <svg width="360" height="360" viewBox="0 0 24 24" fill={accent}>
+          <path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z" />
+        </svg>
+      </div>
+      <Content style={{ flexDirection: "column", justifyContent: "center", padding: "0 6%", gap: 20 }}>
+        {has("brand") && <div style={eyebrowStyle(darken(accent, 0.2), fonts, 14)}>{f("brand")}</div>}
+        {(lead || place) && (
+          <h2
+            style={{
+              fontFamily: fonts.heading,
+              fontWeight: fonts.headingWeight,
+              fontSize: 82,
+              lineHeight: 0.98,
+              letterSpacing: "-0.02em",
+              color: text,
+              margin: 0,
+              maxWidth: "78%",
+            }}
+          >
+            {lead}
+            {lead && place ? " " : ""}
+            {place && (
+              <span style={{ color: accent, fontStyle: "italic", fontWeight: 400 }}>
+                {place}
+                {/* a period reads as a finished statement, like the reference */}
+                {/\.$/.test(place) ? "" : "."}
+              </span>
+            )}
+          </h2>
+        )}
+      </Content>
+    </>
+  );
+}
+
+// ── 24. SEASONAL GREETING ────────────────────────────────────────────────────────
+// Pale card, centered big serif italic-accent greeting, a small centered
+// "FROM ALL OF US AT ..." (brand) line beneath. A holiday/seasonal slot.
+function Seasonal({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent, ink } = ctx;
+  const text = darken(ink, 0.05);
+  return (
+    <Content style={{ flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "0 9%", textAlign: "center", gap: 26 }}>
+      <div aria-hidden style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 40, height: 1, background: alpha(text, 0.4) }} />
+        <div style={{ width: 7, height: 7, borderRadius: "50%", background: accent }} />
+        <div style={{ width: 40, height: 1, background: alpha(text, 0.4) }} />
+      </div>
+      {has("headline") && (
+        <h2
+          style={{
+            fontFamily: fonts.heading,
+            fontStyle: "italic",
+            fontWeight: 300,
+            fontSize: 56,
+            lineHeight: 1.12,
+            letterSpacing: "-0.01em",
+            textAlign: "center",
+            color: text,
+            margin: 0,
+          }}
+        >
+          {f("headline")}
+        </h2>
+      )}
+      {has("brand") && (
+        <div style={{ ...metaStyle(alpha(text, 0.6), fonts, 13), letterSpacing: "0.36em" }}>{f("brand")}</div>
+      )}
+    </Content>
+  );
+}
+
+// ── 25. DID YOU KNOW (education) ──────────────────────────────────────────────────
+// Deep panel, small gold "DID YOU KNOW?" eyebrow, a large serif hero with an
+// italic accent word, one supporting line, brand bottom-right.
+function DidYouKnow({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent, ink, paper } = ctx;
+  const onDark = paper;
+  const gold = lighten(accent, 0.2);
+  return (
+    <Content style={{ flexDirection: "column", justifyContent: "center", padding: "5% 6%", gap: 20 }}>
+      {has("eyebrow") && <div style={eyebrowStyle(gold, fonts, 14)}>{f("eyebrow")}</div>}
+      {has("headline") && (
+        <AccentHeadline
+          text={f("headline")}
+          fonts={fonts}
+          color={onDark}
+          accent={gold}
+          fontSize={58}
+          weight={400}
+          italicAccent
+          lineHeight={1.08}
+          maxWidth="82%"
+        />
+      )}
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 24, marginTop: 6 }}>
+        {has("tagline") && (
+          <div style={{ fontFamily: fonts.body, fontSize: 20, lineHeight: 1.4, color: alpha(onDark, 0.78), maxWidth: "66%" }}>
+            {f("tagline")}
+          </div>
+        )}
+        {has("brand") && (
+          <div style={{ ...metaStyle(alpha(onDark, 0.7), fonts, 13), textAlign: "right", whiteSpace: "nowrap" }}>{f("brand")}</div>
+        )}
+      </div>
+    </Content>
+  );
+}
+
+// ── 26. MILESTONE / ANNIVERSARY ───────────────────────────────────────────────────
+// Deep panel with a GIANT ghost numeral (the Offer, e.g. "5") bleeding off the
+// right, eyebrow "ANNIVERSARY", a serif hero with an italic accent + a thank-you
+// line. The number treatment is drawn here (not the ghost-text finish) so it
+// bleeds off-edge exactly.
+function Milestone({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent, ink, paper } = ctx;
+  const onDark = paper;
+  const gold = lighten(accent, 0.2);
+  return (
+    <>
+      {has("offer") && (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            right: "-4%",
+            top: "50%",
+            transform: "translateY(-50%)",
+            fontFamily: fonts.heading,
+            fontWeight: 800,
+            fontSize: 560,
+            lineHeight: 0.8,
+            letterSpacing: "-0.04em",
+            color: alpha(gold, 0.14),
+            userSelect: "none",
+          }}
+        >
+          {f("offer")}
+        </div>
+      )}
+      <Content style={{ flexDirection: "column", justifyContent: "center", padding: "0 6%", gap: 18 }}>
+        {has("eyebrow") && <div style={eyebrowStyle(gold, fonts, 14)}>{f("eyebrow")}</div>}
+        {has("headline") && (
+          <AccentHeadline
+            text={f("headline")}
+            fonts={fonts}
+            color={onDark}
+            accent={gold}
+            fontSize={68}
+            weight={fonts.headingWeight}
+            italicAccent
+            lineHeight={1.0}
+            maxWidth="72%"
+          />
+        )}
+        {has("tagline") && (
+          <div style={{ fontFamily: fonts.body, fontSize: 20, lineHeight: 1.4, color: alpha(onDark, 0.78), maxWidth: "64%" }}>
+            {f("tagline")}
+          </div>
+        )}
+      </Content>
+    </>
+  );
+}
+
+// ── 27. BEHIND THE SCENES (full-bleed photo) ──────────────────────────────────────
+// A real interior/office photo full-bleed with a left scrim, an eyebrow, a big
+// serif stacked hero (line-broken, italic accent last line), brand meta bottom.
+function BehindTheScenes({ ctx }: { ctx: TemplateContext }) {
+  const { f, has, fonts, accent } = ctx;
+  const onDark = "#ffffff";
+  const gold = lighten(accent, 0.25);
+  const lines = splitThree(f("headline"));
+  return (
+    <Content style={{ flexDirection: "column", justifyContent: "flex-end", padding: "4%" }}>
+      {has("eyebrow") && (
+        <div style={{ ...eyebrowStyle(gold, fonts, 14), marginBottom: 16 }}>{f("eyebrow")}</div>
+      )}
+      {has("headline") && (
+        <div style={{ lineHeight: 1.0 }}>
+          {lines.map((ln, i) => (
+            <div
+              key={i}
+              style={{
+                fontFamily: fonts.heading,
+                fontWeight: i === lines.length - 1 ? 400 : fonts.headingWeight,
+                fontStyle: i === lines.length - 1 ? "italic" : "normal",
+                fontSize: 66,
+                letterSpacing: "-0.02em",
+                color: i === lines.length - 1 ? gold : onDark,
+              }}
+            >
+              {ln}
+            </div>
+          ))}
+        </div>
+      )}
+      {has("brand") && (
+        <div style={{ ...metaStyle(alpha(onDark, 0.8), fonts, 13), marginTop: 18 }}>{f("brand")}</div>
+      )}
+    </Content>
+  );
+}
+
 // ── The registry ──────────────────────────────────────────────────────────────
 // Each entry ties the metadata + finish defaults + composition together. baseColor
 // and finishConfigs make the SAME finish look right per template.
@@ -1416,14 +1821,149 @@ export const TEMPLATES: Record<TemplateId, TemplateDef & { render: (ctx: Templat
     }),
     render: (ctx) => <Stat ctx={ctx} />,
   },
+
+  // ── WAVE 2 (2026-07-18, Lovable provider-kit inspirations) ─────────────────
+  "provider-profile": {
+    id: "provider-profile",
+    name: "Provider profile",
+    purpose: "Introduce a person — rounded photo, name, credential.",
+    fields: ["eyebrow", "brand", "offer", "tagline", "contact"],
+    usesLogo: false,
+    photoMode: "panel",
+    forcePanelStyle: "inset", // the rounded-inset crop is the whole point
+    defaultFinishes: ["grain"],
+    applicableFinishes: ["grain", "blur-blob"],
+    baseColor: (c) => c.ink,
+    // Deep diagonal panel. The card-separation glow is drawn BEHIND the rounded
+    // photo card itself (see PhotoPanel inset branch, which reads accent), so it
+    // haloes out from the card edges rather than sitting on the photo.
+    background: (c) =>
+      `linear-gradient(120deg, ${darken(c.ink, 0.15)} 0%, ${c.ink} 45%, ${lighten(c.ink, 0.12)} 100%)`,
+    palette: (c) => ({ base: c.ink }),
+    finishConfigs: (c) => ({
+      "blur-blob": { blobColor: lighten(c.accent, 0.2), blobX: 75, blobY: 78, blobSize: 44, blobAlpha: 0.3 },
+      grain: { grainAlpha: 0.07 },
+    }),
+    render: (ctx) => <ProviderProfile ctx={ctx} />,
+  },
+  "testimonial-bold": {
+    id: "testimonial-bold",
+    name: "Testimonial (bold)",
+    purpose: "A big quote, five stars — social proof that shouts.",
+    fields: ["quote", "attribution", "brand"],
+    usesLogo: false,
+    defaultFinishes: [],
+    applicableFinishes: ["keyline", "grain", "blur-blob"],
+    baseColor: (c) => lighten(c.paper, 0.3),
+    background: (c) => lighten(c.paper, 0.3),
+    palette: (c) => ({ base: lighten(c.paper, 0.3) }),
+    finishConfigs: (c) => ({ keyline: { keyColor: alpha(c.accent, 0.3), keyInset: 3 } }),
+    render: (ctx) => <TestimonialBold ctx={ctx} />,
+  },
+  "how-it-works": {
+    id: "how-it-works",
+    name: "How it works",
+    purpose: "Your steps — 2 to 4, one line each. Listen, test, treat.",
+    fields: ["eyebrow", "brand"],
+    usesLogo: false,
+    usesSteps: true,
+    defaultFinishes: ["grain"],
+    applicableFinishes: ["grain", "blur-blob", "keyline"],
+    baseColor: (c) => c.ink,
+    background: (c) =>
+      `radial-gradient(130% 130% at 15% 20%, ${lighten(c.ink, 0.14)} 0%, ${c.ink} 55%, ${darken(c.ink, 0.18)} 100%)`,
+    palette: (c) => ({ base: c.ink }),
+    finishConfigs: () => ({ grain: { grainAlpha: 0.07 } }),
+    render: (ctx) => <HowItWorks ctx={ctx} />,
+  },
+  "local-pride": {
+    id: "local-pride",
+    name: "Local pride",
+    purpose: "Name your town — proudly caring for {city}.",
+    fields: ["brand", "headline", "location"],
+    usesLogo: false,
+    defaultFinishes: [],
+    applicableFinishes: ["grain", "keyline", "blur-blob"],
+    baseColor: (c) => lighten(c.paper, 0.2),
+    background: (c) =>
+      `radial-gradient(120% 130% at 80% 50%, ${lighten(c.accent, 0.55)} 0%, ${lighten(c.paper, 0.2)} 55%)`,
+    palette: (c) => ({ base: lighten(c.paper, 0.2) }),
+    finishConfigs: () => ({}),
+    render: (ctx) => <LocalPride ctx={ctx} />,
+  },
+  seasonal: {
+    id: "seasonal",
+    name: "Seasonal greeting",
+    purpose: "A holiday note — warm, centered, from the team.",
+    fields: ["headline", "brand"],
+    usesLogo: false,
+    defaultFinishes: ["keyline"],
+    applicableFinishes: ["keyline", "grain", "blur-blob"],
+    baseColor: (c) => lighten(c.paper, 0.3),
+    background: (c) =>
+      `radial-gradient(120% 130% at 50% 25%, ${lighten(c.paper, 0.4)} 0%, ${lighten(c.paper, 0.15)} 70%)`,
+    palette: (c) => ({ base: lighten(c.paper, 0.3) }),
+    finishConfigs: (c) => ({ keyline: { keyColor: alpha(c.accent, 0.35), keyInset: 3 } }),
+    render: (ctx) => <Seasonal ctx={ctx} />,
+  },
+  "did-you-know": {
+    id: "did-you-know",
+    name: "Did you know?",
+    purpose: "Teach one fact — an educational post.",
+    fields: ["eyebrow", "headline", "tagline", "brand"],
+    usesLogo: false,
+    defaultFinishes: ["grain"],
+    applicableFinishes: ["grain", "blur-blob", "keyline", "ghost-text"],
+    baseColor: (c) => c.ink,
+    background: (c) =>
+      `linear-gradient(125deg, ${c.ink} 0%, ${lighten(c.ink, 0.1)} 55%, ${darken(c.ink, 0.1)} 100%)`,
+    palette: (c) => ({ base: c.ink }),
+    finishConfigs: () => ({ grain: { grainAlpha: 0.07 } }),
+    render: (ctx) => <DidYouKnow ctx={ctx} />,
+  },
+  milestone: {
+    id: "milestone",
+    name: "Milestone",
+    purpose: "Mark an anniversary — a giant number, a thank-you.",
+    fields: ["eyebrow", "offer", "headline", "tagline"],
+    usesLogo: false,
+    defaultFinishes: ["grain"],
+    applicableFinishes: ["grain", "blur-blob", "keyline"],
+    baseColor: (c) => c.ink,
+    background: (c) =>
+      `radial-gradient(130% 140% at 25% 25%, ${lighten(c.ink, 0.12)} 0%, ${c.ink} 55%, ${darken(c.ink, 0.2)} 100%)`,
+    palette: (c) => ({ base: c.ink }),
+    finishConfigs: () => ({ grain: { grainAlpha: 0.07 } }),
+    render: (ctx) => <Milestone ctx={ctx} />,
+  },
+  "behind-the-scenes": {
+    id: "behind-the-scenes",
+    name: "Behind the scenes",
+    purpose: "Show the space — a full-bleed room with a soft line.",
+    fields: ["eyebrow", "headline", "brand"],
+    usesLogo: false,
+    photoMode: "fullbleed",
+    defaultFinishes: ["scrim", "grain"],
+    applicableFinishes: ["scrim", "grain", "blur-blob"],
+    baseColor: (c) => c.ink,
+    background: (c) => c.ink,
+    palette: (c) => ({ base: c.ink }),
+    finishConfigs: () => ({
+      scrim: { scrimSide: "left", scrimStrength: 0.78 },
+      grain: { grainAlpha: 0.08 },
+    }),
+    render: (ctx) => <BehindTheScenes ctx={ctx} />,
+  },
 };
 
 export const TEMPLATE_LIST: TemplateId[] = [
   // Photo-forward first — the newest, most-wanted capability leads the gallery.
+  "provider-profile",
   "team-intro",
   "product-hero",
   "quote",
   "event",
+  "behind-the-scenes",
   "split-feature",
   "brand-story",
   // Promo / action
@@ -1432,10 +1972,17 @@ export const TEMPLATE_LIST: TemplateId[] = [
   "cta",
   "announcement",
   // Proof / credibility
+  "testimonial-bold",
   "testimonial",
   "stat",
+  "milestone",
   "credential",
   "menu",
+  // Story / education / seasonal
+  "how-it-works",
+  "did-you-know",
+  "local-pride",
+  "seasonal",
   // Brand / typographic
   "logo",
   "wordmark",

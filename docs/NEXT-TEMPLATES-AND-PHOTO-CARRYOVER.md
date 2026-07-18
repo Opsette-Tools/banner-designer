@@ -145,6 +145,53 @@ numerals/marks, and gold-on-deep meta lines. Lean into those.
 3. Update `TEMPLATE_LIST` grouping, verify each at all 4 platform sizes, build,
    commit as `deebuilt`, push (Actions redeploys).
 
+---
+
+## ✅ COMPLETED 2026-07-18 (this session)
+
+### Position-pad pixelation — FIXED
+`makePhotoThumb()` in `photo.tsx` — stepped/mipmap downscale (halve repeatedly to
+~2× target, then one final high-quality step) to a 320px thumbnail, cached per
+source and shown in the pad instead of the raw source. `PhotoFocusPad`
+(`BannerPanel.tsx`) renders the thumb, falling back to the source until ready.
+
+### 8 templates built + then made CONTEXTUAL (Ruthnie's key correction)
+All 8 shipped (provider-profile, testimonial-bold, how-it-works, local-pride,
+seasonal, did-you-know, milestone, behind-the-scenes). But several needed real
+content the flat field model couldn't express, so we grew the model **in this
+same session** (no separate plan doc — this WAS the breakout):
+- **`steps` structured list** on `BannerState` (2–4 rows, title+body). New
+  `usesSteps` flag on `TemplateDef`; a real add/remove **StepsEditor** in the
+  sidebar; `how-it-works` reads `ctx.steps`, layout adapts to 2/3/4 columns.
+  Persists + hydrates + rides the blob. Replaced the old tagline-cram parser.
+- **`location` field** for `local-pride` — the city is its own field and the
+  italic-accent word; the "local" premise is real now.
+- **Provider profile glow** — an accent-tinted blurred layer drawn BEHIND the
+  rounded inset card (in `PhotoPanel`'s inset branch, `glowColor={ctx.accent}`),
+  haloing past the card edges so it floats above the panel. NOT on the photo.
+- **`panelStyle: "seam" | "inset"`** on `PhotoSpec` + a "Photo style" toggle
+  (hidden when a template forces it via `forcePanelStyle`).
+- Testimonial-bold: dropped the default keyline frame (matches the reference).
+- Seasonal: plain centered italic serif (dropped the awkward per-word accent).
+- `AccentHeadline` also gained optional `*asterisk*` accent-marker support
+  (harmless; only triggers if the user types asterisks). Not surfaced in UI.
+
+### ⚠️ STILL OPEN — hand to a fresh session (perf + CORS, NOT template work)
+The dev server is painfully slow with a photo present (refresh 10s+), and the
+console throws **"inlining remote CSS file — SecurityError"** on every render.
+Two separate problems, both in the bitmap-preview path, not the templates:
+1. **Bitmap render cost.** `useBannerBitmap` renders a full-res PNG off-screen
+   (html-to-image) per change across the large preview + 4 filmstrip thumbs + up
+   to 27 gallery cards. With a photo, that's heavy. Needs: gate the gallery/
+   filmstrip off the bitmap path (they can stay live-DOM), debounce harder, or
+   cache more aggressively. Consider only bitmap-ing the FOCUSED preview.
+2. **CORS CSS inline error.** html-to-image tries to inline a cross-origin
+   stylesheet (Google Fonts `@import`) and throws SecurityError each render.
+   Fix: `skipFonts`/`fontEmbedCSS` option, or self-host the font CSS, or filter
+   the offending stylesheet. This spam also slows every render.
+Neither blocks the templates shipping — production may behave better — but the
+dev experience is the thing to fix next.
+
 ## House rules reminder for the working agent
 - Typecheck: `npx tsc --noEmit` (flat tsconfig — NOT `tsc -b`; that's Icon Kit).
 - Don't run the full `npm run build` until verify-then-commit.

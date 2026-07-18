@@ -16,7 +16,7 @@
 //  No Math.random anywhere (deterministic export, house rule).
 
 import type { CSSProperties } from "react";
-import type { PhotoSpec } from "./model";
+import type { PhotoSpec, PhotoPanelStyle } from "./model";
 
 // ── High-quality downscale at upload ─────────────────────────────────────────
 // A detailed portrait at 2000px+ downscaled straight to a ~700px panel by the
@@ -59,6 +59,74 @@ export function resizePhotoDataUrl(raw: string): Promise<string> {
       }
     };
     img.onerror = () => resolve(raw); // can't decode to resize — use as-is
+    img.src = raw;
+  });
+}
+
+// ── Small stepped-downscale thumbnail (for the focal-Position pad) ───────────
+// The 132px Position pad showed the full-res source <img> scaled to a ~12×
+// downscale in ONE step, which the browser resamples cheaply → aliased/mottled,
+// and it "never settles" because there's no crisp PNG path like the big preview.
+// The cure is the classic mipmap trick: halve the canvas repeatedly (each halve
+// is a gentle, well-filtered step) down to ~2× the display size, then hand the
+// browser one last small step. That produces a smooth thumbnail we can show in
+// the pad instead of the raw source.
+const THUMB_EDGE = 320; // long-edge of the cached pad thumbnail (~2.4× the 132px pad)
+
+/** Stepped/mipmap downscale of a data URL to a small (THUMB_EDGE) thumbnail with
+ *  high-quality resampling at every step. Returns null if it can't decode. Used
+ *  only for the on-screen focal pad — never for export. */
+export function makePhotoThumb(raw: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    if (!raw || !raw.startsWith("data:image")) return resolve(null);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        let cw = img.width;
+        let ch = img.height;
+        const long = Math.max(cw, ch);
+        if (long <= THUMB_EDGE) return resolve(raw); // already small — use as-is
+
+        // Draw the source onto a working canvas, then halve repeatedly until the
+        // next halve would undershoot THUMB_EDGE, then do a final exact step.
+        let src: HTMLCanvasElement | HTMLImageElement = img;
+        let curW = cw;
+        let curH = ch;
+        const step = (w: number, h: number, source: HTMLCanvasElement | HTMLImageElement, sw: number, sh: number) => {
+          const c = document.createElement("canvas");
+          c.width = w;
+          c.height = h;
+          const cx = c.getContext("2d");
+          if (!cx) return null;
+          cx.imageSmoothingEnabled = true;
+          cx.imageSmoothingQuality = "high";
+          cx.drawImage(source, 0, 0, sw, sh, 0, 0, w, h);
+          return c;
+        };
+
+        // Repeated halving (each step ≤2× reduction → the browser filters it well).
+        while (Math.max(curW, curH) > THUMB_EDGE * 2) {
+          const nextW = Math.max(1, Math.round(curW / 2));
+          const nextH = Math.max(1, Math.round(curH / 2));
+          const c = step(nextW, nextH, src, curW, curH);
+          if (!c) return resolve(raw);
+          src = c;
+          curW = nextW;
+          curH = nextH;
+        }
+
+        // Final exact step to THUMB_EDGE on the long edge.
+        const finalScale = THUMB_EDGE / Math.max(curW, curH);
+        cw = Math.max(1, Math.round(curW * finalScale));
+        ch = Math.max(1, Math.round(curH * finalScale));
+        const out = step(cw, ch, src, curW, curH);
+        if (!out) return resolve(raw);
+        resolve(out.toDataURL("image/jpeg", 0.9));
+      } catch {
+        resolve(raw);
+      }
+    };
+    img.onerror = () => resolve(null);
     img.src = raw;
   });
 }
@@ -178,19 +246,98 @@ function panelClip(side: "left" | "right", divider: PhotoSpec["divider"]): strin
 /** The clear text zone {x0,x1} as % of the node, given a panel on `side`.
  *  Templates read this to keep copy off the photo. Accounts for the diagonal
  *  lean so text clears the widest point of the seam. */
-export function photoTextZone(spec: PhotoSpec): { x0: number; x1: number } {
+export function photoTextZone(spec: PhotoSpec, panelStyle: PhotoPanelStyle = "seam"): { x0: number; x1: number } {
   const panel = PANEL_FRACTION * 100;
-  const lean = spec.divider === "straight" ? 0 : DIAGONAL_LEAN * 100;
+  // Inset floats a card within the panel box (no seam lean); text clears at the
+  // box edge. Seam adds the diagonal/curve lean so copy clears the widest point.
+  const lean = panelStyle === "inset" || spec.divider === "straight" ? 0 : DIAGONAL_LEAN * 100;
   if (spec.side === "left") {
     return { x0: panel + lean + 3, x1: 100 };
   }
   return { x0: 0, x1: 100 - panel - lean - 3 };
 }
 
-/** The carved side panel. Absolutely positioned to cover its side of the node. */
-export function PhotoPanel({ spec }: { spec: PhotoSpec }) {
+/** Resolve the effective panel style: a template can FORCE inset/seam; otherwise
+ *  the user's choice on the spec wins (defaulting to seam for older saved state). */
+export function resolvePanelStyle(spec: PhotoSpec, force?: PhotoPanelStyle): PhotoPanelStyle {
+  return force ?? spec.panelStyle ?? "seam";
+}
+
+// How far the rounded-inset card is inset from the panel-box edges (as a % of the
+// node's short dimension, applied as a padding on the box). Tuned to leave an
+// even margin of panel-background around a floated photo card at every ratio.
+const INSET_PAD = 8; // % of the panel box
+
+/** The carved side panel. Absolutely positioned to cover its side of the node.
+ *  In "inset" style the photo floats as a rounded card on the panel background
+ *  instead of carving edge-to-edge behind a seam. */
+export function PhotoPanel({
+  spec,
+  style,
+  panelBg,
+  glowColor,
+}: {
+  spec: PhotoSpec;
+  style?: PhotoPanelStyle;
+  panelBg?: string;
+  /** Accent tint for the behind-the-card glow (inset style only). */
+  glowColor?: string;
+}) {
   if (!spec.dataUrl) return null;
+  const panelStyle = resolvePanelStyle(spec, style);
   const panelPct = PANEL_FRACTION * 100;
+
+  if (panelStyle === "inset") {
+    // The panel BOX is a plain rectangle (no lean); the photo is a rounded card
+    // floated inside it with even padding + a soft shadow, over an optional
+    // background wash (so it reads as a card, not a full carve).
+    const boxStyle: CSSProperties = {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      width: `${panelPct}%`,
+      ...(spec.side === "left" ? { left: 0 } : { right: 0 }),
+      background: panelBg ?? "transparent",
+      overflow: "visible", // let the glow bleed past the box onto the panel
+    };
+    // A soft accent glow that sits BEHIND the card and haloes out past its edges,
+    // so the card reads as floating ABOVE a lit surface instead of blending into
+    // the panel. Larger than the card + blurred; drawn before (under) the card.
+    const glow = glowColor ?? "#ffffff";
+    return (
+      <div aria-hidden style={boxStyle}>
+        <div
+          style={{
+            position: "absolute",
+            top: `${INSET_PAD - 3}%`,
+            bottom: `${INSET_PAD - 3}%`,
+            left: `${INSET_PAD - 3}%`,
+            right: `${INSET_PAD - 3}%`,
+            borderRadius: 40,
+            background: glow,
+            opacity: 0.4,
+            filter: "blur(34px)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: `${INSET_PAD}%`,
+            bottom: `${INSET_PAD}%`,
+            left: `${INSET_PAD}%`,
+            right: `${INSET_PAD}%`,
+            borderRadius: 28,
+            overflow: "hidden",
+            boxShadow: "0 30px 60px -24px rgba(10,20,16,0.55), 0 8px 20px -12px rgba(10,20,16,0.4)",
+          }}
+        >
+          <div style={photoFillStyle(spec)} />
+        </div>
+      </div>
+    );
+  }
+
+  // Seam style (original): carve the photo edge-to-edge behind a shaped seam.
   const clip = panelClip(spec.side, spec.divider);
   const boxStyle: CSSProperties = {
     position: "absolute",

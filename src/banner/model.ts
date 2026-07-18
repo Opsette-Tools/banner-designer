@@ -30,7 +30,8 @@ export type FieldKey =
   | "website"    // url
   | "quote"      // a testimonial / pull-quote line
   | "attribution" // who said the quote (name, role)
-  | "detail";    // a date / time / location / secondary detail line
+  | "detail"     // a date / time / location / secondary detail line
+  | "location";  // a place — city / neighborhood (Local pride's accent word)
 
 export interface FieldDef {
   key: FieldKey;
@@ -53,7 +54,29 @@ export const FIELDS: Record<FieldKey, FieldDef> = {
   quote: { key: "quote", label: "Quote", placeholder: "The best care I've had in years.", long: true },
   attribution: { key: "attribution", label: "Attributed to", placeholder: "Maria G. · Patient since 2021" },
   detail: { key: "detail", label: "Detail line", placeholder: "Saturday, May 18 · 10am–2pm" },
+  location: { key: "location", label: "Location", placeholder: "Portland" },
 };
+
+// ── Steps (structured, for the "How it works" 2–4 step layout) ────────────────
+// A short, ordered list of (title, body) pairs. Unlike the flat text fields, this
+// is a real structured value so the layout can render N step columns. A template
+// declares it uses steps via `usesSteps` on its def; the editor then shows a
+// small add/remove row editor instead of a plain field.
+export interface Step {
+  title: string;
+  body: string;
+}
+
+/** Clamp range for the flexible step count (2–4). MIN keeps the layout from
+ *  collapsing to a single column; MAX keeps columns readable at banner sizes. */
+export const MIN_STEPS = 2;
+export const MAX_STEPS = 4;
+
+export const DEFAULT_STEPS: Step[] = [
+  { title: "Listen", body: "We start with your story, your symptoms, and your goals." },
+  { title: "Test", body: "Labs and markers that reveal what standard visits miss." },
+  { title: "Treat", body: "A plan tailored to you — adjusted as you go." },
+];
 
 /** The uploaded logo (data URL) — separate from text fields; not every template uses it. */
 
@@ -70,6 +93,14 @@ export const FIELDS: Record<FieldKey, FieldDef> = {
 
 export type PhotoDivider = "straight" | "diagonal" | "curve";
 
+// How a PANEL photo is shaped:
+//   • "seam"  — the photo is carved edge-to-edge on one side behind a straight/
+//               diagonal/curve seam (the original look; uses `divider`).
+//   • "inset" — the photo floats as a rounded-rectangle card inset on the panel
+//               background (the "provider profile" look). Ignores `divider`.
+// A template can force one via `forcePanelStyle`; otherwise the user picks.
+export type PhotoPanelStyle = "seam" | "inset";
+
 export interface PhotoSpec {
   /** The uploaded image as a data URL, or null when none. */
   dataUrl: string | null;
@@ -77,6 +108,8 @@ export interface PhotoSpec {
   side: "left" | "right";
   /** The seam shape between the panel and the text (ignored in full-bleed). */
   divider: PhotoDivider;
+  /** Seam-carved vs. floated rounded-inset card (panel mode only). */
+  panelStyle: PhotoPanelStyle;
   /** Cover-scale multiplier: 1 = fill, up to 2.5 = punch in. */
   zoom: number;
   /** Focal point 0..1 — what stays visible when the photo is cropped. */
@@ -88,6 +121,7 @@ export const DEFAULT_PHOTO: PhotoSpec = {
   dataUrl: null,
   side: "left",
   divider: "diagonal",
+  panelStyle: "seam",
   zoom: 1,
   focusX: 0.5,
   focusY: 0.35, // faces sit slightly above center — this frames them by default
@@ -181,7 +215,16 @@ export type TemplateId =
   | "menu"
   | "countdown"
   | "wordmark"
-  | "stat";
+  | "stat"
+  // ── wave 2 templates (added 2026-07-18, from Lovable provider-kit mockups) ──
+  | "provider-profile"  // photo panel, rounded-inset crop
+  | "testimonial-bold"  // giant quote-mark, huge serif quote, star row
+  | "how-it-works"      // 01 02 03 steps across a hairline
+  | "local-pride"       // map-pin watermark + "proudly caring for {city}"
+  | "seasonal"          // centered serif italic greeting on a pale card
+  | "did-you-know"      // deep panel education fact
+  | "milestone"         // giant ghost numeral anniversary
+  | "behind-the-scenes"; // full-bleed interior photo + stacked hero
 
 // ── The full design state ────────────────────────────────────────────────────
 // This is what persists (localStorage) and what rides in the reopen/export blob.
@@ -201,6 +244,11 @@ export interface BannerState {
   // Content — one value per field key, SHARED across platforms. A template reads
   // only the keys it maps.
   fields: Record<FieldKey, string>;
+
+  // Structured step list (shared) — read only by templates that declare
+  // `usesSteps` (How it works). Kept separate from `fields` because it's a list
+  // of (title, body) pairs, not a single string.
+  steps: Step[];
 
   // Uploaded logo (data URL) — used by templates that map a logo slot.
   logoDataUrl: string | null;
@@ -234,6 +282,7 @@ export const DEFAULT_FIELDS: Record<FieldKey, string> = {
   quote: "The best care I've had in years — I actually feel heard.",
   attribution: "Maria G. · Patient since 2021",
   detail: "Saturday, May 18 · 10am – 2pm",
+  location: "Portland",
 };
 
 // A pleasant default template per platform — varied so a fresh open already
@@ -264,6 +313,7 @@ export const bannerInitial: BannerState = {
     twitter: [...DEFAULT_PLATFORM_FINISHES.twitter],
   },
   fields: { ...DEFAULT_FIELDS },
+  steps: DEFAULT_STEPS.map((s) => ({ ...s })),
   logoDataUrl: null,
   photo: { ...DEFAULT_PHOTO },
   accent: "#c8a46b", // gold

@@ -53,7 +53,7 @@ export const BannerNode = forwardRef<HTMLDivElement, { state: BannerState }>(
     const platform = getPlatform(state.platform);
     const tpl = getTemplate(activeTemplateId(state));
     const photoMode = tpl.photoMode ?? "none";
-    const ctx = buildContext(state, photoMode);
+    const ctx = buildContext(state, photoMode, tpl.forcePanelStyle);
     const pal = finishPaletteFor(state);
     const configs = finishConfigsFor(state);
     const hasPhoto = !!state.photo.dataUrl;
@@ -78,7 +78,9 @@ export const BannerNode = forwardRef<HTMLDivElement, { state: BannerState }>(
         <FinishStack finishes={activeFinishes(state)} pal={pal} configs={configs} />
         {/* A carved side panel sits ABOVE the finishes (crisp photo edge) but
             below the content, which reflows off it via ctx.photoZone. */}
-        {photoMode === "panel" && hasPhoto && <PhotoPanel spec={state.photo} />}
+        {photoMode === "panel" && hasPhoto && (
+          <PhotoPanel spec={state.photo} style={tpl.forcePanelStyle} glowColor={ctx.accent} />
+        )}
         {tpl.render(ctx)}
       </div>
     );

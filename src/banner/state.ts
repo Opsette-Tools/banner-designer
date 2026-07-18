@@ -15,12 +15,16 @@ import {
   activeFinishes,
   activeTemplateId,
   DEFAULT_PHOTO,
+  DEFAULT_STEPS,
+  MIN_STEPS,
+  MAX_STEPS,
   type BannerState,
   type FieldKey,
   type FinishKind,
   type PlatformId,
   type TemplateId,
   type PhotoSpec,
+  type Step,
 } from "./model";
 import { getTemplate } from "./templates";
 
@@ -35,6 +39,9 @@ export type BannerAction =
   | { type: "moveFinish"; kind: FinishKind; dir: -1 | 1 }
   | { type: "resetFinishes" }
   | { type: "patchPhoto"; patch: Partial<PhotoSpec> }
+  | { type: "setStep"; index: number; patch: Partial<Step> }
+  | { type: "addStep" }
+  | { type: "removeStep"; index: number }
   | { type: "reset" };
 
 const VALID_FINISHES = new Set(FINISHES.map((f) => f.kind));
@@ -89,9 +96,21 @@ export function hydrate(saved: Partial<BannerState> & { templateId?: TemplateId;
     if (typeof p.dataUrl === "string" || p.dataUrl === null) photo.dataUrl = p.dataUrl;
     if (p.side === "left" || p.side === "right") photo.side = p.side;
     if (p.divider === "straight" || p.divider === "diagonal" || p.divider === "curve") photo.divider = p.divider;
+    if (p.panelStyle === "seam" || p.panelStyle === "inset") photo.panelStyle = p.panelStyle;
     if (typeof p.zoom === "number" && isFinite(p.zoom)) photo.zoom = Math.min(2.5, Math.max(1, p.zoom));
     if (typeof p.focusX === "number" && isFinite(p.focusX)) photo.focusX = Math.min(1, Math.max(0, p.focusX));
     if (typeof p.focusY === "number" && isFinite(p.focusY)) photo.focusY = Math.min(1, Math.max(0, p.focusY));
+  }
+
+  // Steps — a valid saved list (title/body strings), clamped to MIN..MAX. Fall
+  // back to the default 3-step set when absent or malformed.
+  let steps: Step[] = DEFAULT_STEPS.map((st) => ({ ...st }));
+  if (Array.isArray(s.steps)) {
+    const cleaned = s.steps
+      .filter((st): st is Step => !!st && typeof st === "object")
+      .map((st) => ({ title: String(st.title ?? ""), body: String(st.body ?? "") }))
+      .slice(0, MAX_STEPS);
+    if (cleaned.length >= MIN_STEPS) steps = cleaned;
   }
 
   return {
@@ -101,6 +120,7 @@ export function hydrate(saved: Partial<BannerState> & { templateId?: TemplateId;
     platformFinishes,
     fields,
     photo,
+    steps,
     platform: PLATFORM_IDS.includes(s.platform as PlatformId) ? (s.platform as PlatformId) : "facebook",
   };
 }
@@ -146,8 +166,20 @@ export function bannerReducer(s: BannerState, a: BannerAction): BannerState {
       return setActiveFinishes(s, [...getTemplate(activeTemplateId(s)).defaultFinishes]);
     case "patchPhoto":
       return { ...s, photo: { ...s.photo, ...a.patch } };
+    case "setStep": {
+      const steps = s.steps.map((st, i) => (i === a.index ? { ...st, ...a.patch } : st));
+      return { ...s, steps };
+    }
+    case "addStep": {
+      if (s.steps.length >= MAX_STEPS) return s;
+      return { ...s, steps: [...s.steps, { title: "", body: "" }] };
+    }
+    case "removeStep": {
+      if (s.steps.length <= MIN_STEPS) return s;
+      return { ...s, steps: s.steps.filter((_, i) => i !== a.index) };
+    }
     case "reset":
-      return { ...bannerInitial, photo: { ...DEFAULT_PHOTO } };
+      return { ...bannerInitial, photo: { ...DEFAULT_PHOTO }, steps: DEFAULT_STEPS.map((st) => ({ ...st })) };
   }
 }
 

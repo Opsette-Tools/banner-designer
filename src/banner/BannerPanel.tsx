@@ -37,6 +37,8 @@ import {
   finishLabel,
   activeTemplateId,
   activeFinishes,
+  MIN_STEPS,
+  MAX_STEPS,
   type BannerState,
   type FieldKey,
   type FinishKind,
@@ -50,7 +52,7 @@ import {
 } from "./state";
 import { TEMPLATE_LIST, getTemplate, applicableFinishesFor } from "./templates";
 import { BannerSmartPreview, BannerNode, scaledLayerStyle } from "./BannerCanvas";
-import { loadPhotoFile, resizePhotoDataUrl, photoNeedsResize } from "./photo";
+import { loadPhotoFile, resizePhotoDataUrl, photoNeedsResize, makePhotoThumb } from "./photo";
 import { BannerThumb } from "./BannerThumb";
 import { renderPlatformAsset } from "./render-offscreen";
 import { dataUrlToBlob } from "./export";
@@ -194,6 +196,21 @@ function PhotoFocusPad({
   const padRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
 
+  // Show a stepped-downscale thumbnail instead of the full-res source, so the
+  // pad settles crisp like every other surface (the raw source scaled 12× in one
+  // step aliased and "never settled"). Falls back to the source until ready.
+  const [thumb, setThumb] = useState<string>(dataUrl);
+  useEffect(() => {
+    let alive = true;
+    setThumb(dataUrl); // show something immediately while the thumb renders
+    makePhotoThumb(dataUrl).then((t) => {
+      if (alive && t) setThumb(t);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [dataUrl]);
+
   useEffect(() => {
     function setFromEvent(e: PointerEvent) {
       const el = padRef.current;
@@ -243,7 +260,7 @@ function PhotoFocusPad({
         {/* A real <img> (not background-image) downsamples most cleanly in the
             browser, so the pad stays crisp even for a large source photo. */}
         <img
-          src={dataUrl}
+          src={thumb}
           alt=""
           draggable={false}
           style={{
@@ -283,16 +300,22 @@ function PhotoFocusPad({
 function PhotoControls({
   photo,
   mode,
+  forcedPanelStyle,
   onUpload,
   onRemove,
   onPatch,
 }: {
   photo: BannerState["photo"];
   mode: "panel" | "fullbleed";
+  /** When the active template FORCES a panel style, the seam/inset toggle is
+   *  hidden and this style is the one in effect. */
+  forcedPanelStyle?: BannerState["photo"]["panelStyle"];
   onUpload: (file: File) => void;
   onRemove: () => void;
   onPatch: (patch: Partial<BannerState["photo"]>) => void;
 }) {
+  // The style actually in effect: template force wins, else the user's choice.
+  const effectiveStyle = forcedPanelStyle ?? photo.panelStyle ?? "seam";
   const uploadProps: UploadProps = {
     accept: "image/png,image/jpeg,image/webp",
     showUploadList: false,
@@ -323,7 +346,7 @@ function PhotoControls({
 
       {photo.dataUrl && (
         <>
-          {/* Side + divider only matter for the carved panel layout. */}
+          {/* Side + style + divider only matter for the carved panel layout. */}
           {mode === "panel" && (
             <>
               <LabeledField label="Photo side">
@@ -337,18 +360,35 @@ function PhotoControls({
                   ]}
                 />
               </LabeledField>
-              <LabeledField label="Divider shape">
-                <Segmented
-                  block
-                  value={photo.divider}
-                  onChange={(v) => onPatch({ divider: v as BannerState["photo"]["divider"] })}
-                  options={[
-                    { label: "Straight", value: "straight" },
-                    { label: "Diagonal", value: "diagonal" },
-                    { label: "Curve", value: "curve" },
-                  ]}
-                />
-              </LabeledField>
+              {/* Seam-carved vs. rounded-inset card — hidden when the template forces one. */}
+              {!forcedPanelStyle && (
+                <LabeledField label="Photo style">
+                  <Segmented
+                    block
+                    value={photo.panelStyle ?? "seam"}
+                    onChange={(v) => onPatch({ panelStyle: v as BannerState["photo"]["panelStyle"] })}
+                    options={[
+                      { label: "Carved seam", value: "seam" },
+                      { label: "Rounded card", value: "inset" },
+                    ]}
+                  />
+                </LabeledField>
+              )}
+              {/* Divider shape only applies to the carved-seam style. */}
+              {effectiveStyle === "seam" && (
+                <LabeledField label="Divider shape">
+                  <Segmented
+                    block
+                    value={photo.divider}
+                    onChange={(v) => onPatch({ divider: v as BannerState["photo"]["divider"] })}
+                    options={[
+                      { label: "Straight", value: "straight" },
+                      { label: "Diagonal", value: "diagonal" },
+                      { label: "Curve", value: "curve" },
+                    ]}
+                  />
+                </LabeledField>
+              )}
             </>
           )}
           <LabeledField label="Zoom">
@@ -369,6 +409,71 @@ function PhotoControls({
             />
           </LabeledField>
         </>
+      )}
+    </Space>
+  );
+}
+
+// ── Steps editor: add/remove up to MAX_STEPS (title + body) rows ──────────────
+// Shown for templates that declare `usesSteps` (How it works). A real structured
+// editor, not a text blob — the layout reads the same list the user edits here.
+function StepsEditor({
+  steps,
+  onSet,
+  onAdd,
+  onRemove,
+}: {
+  steps: BannerState["steps"];
+  onSet: (index: number, patch: { title?: string; body?: string }) => void;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+}) {
+  return (
+    <Space direction="vertical" size={12} style={{ width: "100%" }}>
+      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        Two to four steps. Each shows a number, a short title, and one line under it.
+      </Typography.Text>
+      {steps.map((step, i) => (
+        <div
+          key={i}
+          style={{
+            border: "1px solid #d9e5e0",
+            borderRadius: 8,
+            padding: "10px 12px",
+            background: "#f7faf8",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#8aa79b" }}>
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <Input
+              placeholder="Step title (e.g. Listen)"
+              value={step.title}
+              onChange={(e) => onSet(i, { title: e.target.value })}
+            />
+            <Button
+              size="small"
+              type="text"
+              danger
+              disabled={steps.length <= MIN_STEPS}
+              onClick={() => onRemove(i)}
+            >
+              Remove
+            </Button>
+          </div>
+          <Input.TextArea
+            autoSize={{ minRows: 1, maxRows: 2 }}
+            placeholder="One line about this step"
+            value={step.body}
+            onChange={(e) => onSet(i, { body: e.target.value })}
+          />
+        </div>
+      ))}
+      {steps.length < MAX_STEPS && (
+        <Button size="small" icon={<InboxOutlined />} onClick={onAdd}>
+          Add step
+        </Button>
       )}
     </Space>
   );
@@ -732,6 +837,14 @@ export function BannerPanel() {
                   </LabeledField>
                 );
               })}
+              {tpl.usesSteps && (
+                <StepsEditor
+                  steps={state.steps}
+                  onSet={(index, patch) => dispatch({ type: "setStep", index, patch })}
+                  onAdd={() => dispatch({ type: "addStep" })}
+                  onRemove={(index) => dispatch({ type: "removeStep", index })}
+                />
+              )}
               {tpl.usesLogo && (
                 <div style={{ marginTop: 4 }}>
                   <Space>
@@ -762,6 +875,7 @@ export function BannerPanel() {
               <PhotoControls
                 photo={state.photo}
                 mode={photoMode}
+                forcedPanelStyle={tpl.forcePanelStyle}
                 onUpload={onPhotoUpload}
                 onRemove={() => dispatch({ type: "patchPhoto", patch: { dataUrl: null } })}
                 onPatch={(patch) => dispatch({ type: "patchPhoto", patch })}
