@@ -60,27 +60,10 @@ import { buildCombinedExport } from "@/lib/icon-kit/export-assets";
 import { isEmbedded } from "@/lib/opsette-kit-link";
 import { downloadBlob } from "@/lib/icon-kit/download";
 import { fromSocialKitJson, configForTab } from "@/lib/icon-kit/brand-kit";
-import { FONT_PAIRINGS, cssFamily, pairingLabel, loadPairing, getPairing } from "@/lib/shared-fonts";
+import { loadPairing, getPairing } from "@/lib/shared-fonts";
+import { OpsetteFontPicker } from "@/components/opsette-font-picker";
 import { usePersistentReducer } from "@/hooks/use-persistent-reducer";
 import { SectionCard } from "@/components/icon-kit/SectionCard";
-
-// ── Self-contained font picker (heading-styled option labels) ─────────────────
-function FontPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
-  return (
-    <Select
-      value={value}
-      onChange={onChange}
-      style={{ width: "100%" }}
-      showSearch
-      optionFilterProp="title"
-      options={FONT_PAIRINGS.map((p) => ({
-        value: p.id,
-        title: pairingLabel(p),
-        label: <span style={{ fontFamily: cssFamily(p.heading) }}>{pairingLabel(p)}</span>,
-      }))}
-    />
-  );
-}
 
 // ── Finish stack control: multiselect + reorder (model change #2) ─────────────
 function FinishStackControl({
@@ -901,7 +884,7 @@ export function BannerPanel() {
 
           {/* 3. Type */}
           <SectionCard title="3. Type" collapsible>
-            <FontPicker value={state.fontId} onChange={(id) => dispatch({ type: "patch", patch: { fontId: id } })} />
+            <OpsetteFontPicker value={state.fontId} onChange={(id) => dispatch({ type: "patch", patch: { fontId: id } })} />
           </SectionCard>
 
           {/* 4. Finishes — for the ACTIVE platform */}
